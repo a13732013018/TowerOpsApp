@@ -25,14 +25,12 @@ import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity {
 
-    // UI 控件
     private TextView        tvUserInfo, tvProgress, tvNextRun;
     private CheckBox        cbFeedback, cbAccept, cbRevert;
     private EditText        etFbMin, etFbMax, etAccMin, etAccMax, etIntMin, etIntMax;
     private Button          btnStart, btnStop;
     private WorkOrderAdapter adapter;
 
-    // 运行状态
     private volatile boolean monitoring = false;
     private final Handler    mainHandler  = new Handler(Looper.getMainLooper());
     private final ExecutorService pool    = Executors.newCachedThreadPool();
@@ -52,9 +50,6 @@ public class MainActivity extends AppCompatActivity {
         btnStop.setOnClickListener(v  -> stopMonitor());
     }
 
-    // ─────────────────────────────────────────────
-    // 绑定控件
-    // ─────────────────────────────────────────────
     private void bindViews() {
         tvUserInfo = findViewById(R.id.tvUserInfo);
         tvProgress = findViewById(R.id.tvProgress);
@@ -84,16 +79,13 @@ public class MainActivity extends AppCompatActivity {
         tvUserInfo.setText(s.username.isEmpty() ? "未登录" : s.username + " | " + s.userid);
     }
 
-    // ─────────────────────────────────────────────
-    // 开始监控
-    // ─────────────────────────────────────────────
     private void startMonitor() {
         if (monitoring) { Toast.makeText(this, "监控已在运行", Toast.LENGTH_SHORT).show(); return; }
         monitoring = true;
         btnStart.setText("监控中...");
         btnStart.setEnabled(false);
         tvProgress.setText("监控已启动");
-        runOnce();          // 立即执行一次
+        runOnce();
     }
 
     private void stopMonitor() {
@@ -105,15 +97,9 @@ public class MainActivity extends AppCompatActivity {
         tvNextRun.setText("");
     }
 
-    // ─────────────────────────────────────────────
-    // 执行一轮监控
-    // ─────────────────────────────────────────────
     private void runOnce() {
         if (!monitoring) return;
-
-        // 打包配置到 Session（子线程只读，主线程写）
         buildConfig();
-
         tvProgress.setText("拉取工单中...");
 
         pool.execute(new MonitorTask(new MonitorTask.MonitorCallback() {
@@ -130,13 +116,10 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onAllDone() {
-                // 同步智能时间段开关到 UI
                 syncConfigFromSession();
-
                 int done = Session.get().getFinished();
                 int total = Session.get().getTotal();
                 tvProgress.setText("本轮完成：" + done + "/" + total + " 条");
-
                 if (monitoring) scheduleNext();
             }
 
@@ -148,9 +131,6 @@ public class MainActivity extends AppCompatActivity {
         }));
     }
 
-    // ─────────────────────────────────────────────
-    // 随机间隔调度下一轮
-    // ─────────────────────────────────────────────
     private void scheduleNext() {
         int minSec = parseInt(etIntMin.getText().toString(), 30);
         int maxSec = parseInt(etIntMax.getText().toString(), 60);
@@ -165,20 +145,25 @@ public class MainActivity extends AppCompatActivity {
         mainHandler.postDelayed(scheduleRunnable, delaySec * 1000L);
     }
 
-    // ─────────────────────────────────────────────
-    // 将 UI 配置打包写入 Session
-    // ─────────────────────────────────────────────
     private void buildConfig() {
         Session s = Session.get();
         String fb    = cbFeedback.isChecked() ? "true" : "false";
         String acc   = cbAccept.isChecked()   ? "true" : "false";
         String rev   = cbRevert.isChecked()   ? "true" : "false";
-        String range1 = etFbMin.getText().toString().trim()  + "|" + etFbMax.getText().toString().trim();
-        String range2 = etAccMin.getText().toString().trim() + "|" + etAccMax.getText().toString().trim();
+        // 如果输入框为空，使用默认值（反馈：30~60分钟；接单：3~8分钟）
+        String fbMinStr  = etFbMin.getText().toString().trim();
+        String fbMaxStr  = etFbMax.getText().toString().trim();
+        String accMinStr = etAccMin.getText().toString().trim();
+        String accMaxStr = etAccMax.getText().toString().trim();
+        if (fbMinStr.isEmpty())  fbMinStr  = "30";
+        if (fbMaxStr.isEmpty())  fbMaxStr  = "60";
+        if (accMinStr.isEmpty()) accMinStr = "3";
+        if (accMaxStr.isEmpty()) accMaxStr = "8";
+        String range1 = fbMinStr  + "|" + fbMaxStr;
+        String range2 = accMinStr + "|" + accMaxStr;
         s.appConfig = fb + "\u0001" + acc + "\u0001" + rev + "\u0001" + range1 + "\u0001" + range2;
     }
 
-    /** 把 Session 中被智能时段修改过的开关同步回 UI */
     private void syncConfigFromSession() {
         Session s = Session.get();
         if (s.appConfig.isEmpty()) return;
