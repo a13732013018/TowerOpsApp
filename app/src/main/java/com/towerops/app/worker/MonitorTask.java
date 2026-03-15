@@ -100,8 +100,23 @@ public class MonitorTask implements Runnable {
 
                 for (int j = 0; j < actionList.length(); j++) {
                     JSONObject act = actionList.getJSONObject(j);
-                    if ("ACCEPT".equals(act.optString("task_status_dictvalue"))) {
-                        wo.acceptOperator = act.optString("operator");
+                    String taskStatusVal = act.optString("task_status_dictvalue", "");
+                    if ("ACCEPT".equals(taskStatusVal)) {
+                        // 兼容多种字段名：operator / operatorName / operName / handle_user_name
+                        String op = act.optString("operator", "");
+                        if (op.isEmpty()) op = act.optString("operatorName", "");
+                        if (op.isEmpty()) op = act.optString("operName", "");
+                        if (op.isEmpty()) op = act.optString("handle_user_name", "");
+                        if (op.isEmpty()) op = act.optString("handleUserName", "");
+                        if (!op.isEmpty()) wo.acceptOperator = op;
+                    }
+                    // 只要 actionlist 非空且有 ACCEPT 记录，也标记为已接单（兜底）
+                    if (wo.acceptOperator.isEmpty() && !taskStatusVal.isEmpty()
+                            && !"SUBMIT".equals(taskStatusVal)
+                            && !"CREATE".equals(taskStatusVal)) {
+                        String op = act.optString("operator", "");
+                        if (op.isEmpty()) op = act.optString("handle_user_name", "");
+                        if (!op.isEmpty()) wo.acceptOperator = op;
                     }
                     String rawDeal = act.optString("deal_info", "");
                     if (rawDeal.contains("追加描述：") || rawDeal.contains("故障反馈：")) {
@@ -158,7 +173,6 @@ public class MonitorTask implements Runnable {
 
         for (int i = 1; i <= count; i++) {
             final int idx = i;
-            // 等待槽位
             while (!s.tryAcquireSlot(MAX_THREADS)) {
                 try { Thread.sleep(20); } catch (InterruptedException ignored) {}
             }
@@ -178,8 +192,8 @@ public class MonitorTask implements Runnable {
     }
 
     /**
-     * 智能时间段：凌晨 01~05 点自动关闭；06~23 点自动开启
-     * 实际开关由 MainActivity 监听 onAllDone 后处理
+     * 智能时间段：凌晨 01~05 点自动关闭
+     * 其余时间不强制修改用户配置
      */
     private void applyTimeSchedule() {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
@@ -188,16 +202,17 @@ public class MonitorTask implements Runnable {
         String[] parts = s.appConfig.split("\u0001", -1);
         if (parts.length < 3) return;
 
-        if (hour > 1 && hour < 6) {
-            parts[0] = "false"; parts[1] = "false";
-        } else if (hour >= 6) {
-            parts[0] = "true"; parts[1] = "true";
+        // 只在凌晨1~6点之间暂停自动操作（防止夜间误触发）
+        if (hour >= 1 && hour < 6) {
+            parts[0] = "false";
+            parts[1] = "false";
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < parts.length; i++) {
+                sb.append(parts[i]);
+                if (i < parts.length - 1) sb.append("\u0001");
+            }
+            s.appConfig = sb.toString();
         }
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < parts.length; i++) {
-            sb.append(parts[i]);
-            if (i < parts.length - 1) sb.append("\u0001");
-        }
-        s.appConfig = sb.toString();
+        // 注意：不再在 hour>=6 时强制改为 true，避免覆盖用户手动关闭的状态
     }
 }
