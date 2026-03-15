@@ -20,6 +20,15 @@
             android:textColor="#e94560"
             android:textStyle="bold"
             android:gravity="center"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="中国铁塔运维工单自动化平台"
+            android:textSize="12sp"
+            android:textColor="#606080"
+            android:gravity="center"
             android:layout_marginBottom="24dp"/>
 
         <!-- 账号选择 -->
@@ -39,7 +48,7 @@
             android:paddingEnd="12dp"
             android:layout_marginBottom="16dp"/>
 
-        <!-- 图形验证码 -->
+        <!-- 图形验证码区域 -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -47,6 +56,36 @@
             android:textColor="#a0a0c0"
             android:textSize="13sp"
             android:layout_marginBottom="6dp"/>
+
+        <!-- 验证码图片 + 刷新按钮 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="10dp">
+
+            <ImageView
+                android:id="@+id/ivCaptcha"
+                android:layout_width="160dp"
+                android:layout_height="56dp"
+                android:background="@drawable/bg_input"
+                android:scaleType="fitCenter"
+                android:padding="4dp"
+                android:contentDescription="验证码图片（点击刷新）"/>
+
+            <Button
+                android:id="@+id/btnRefreshCaptcha"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="12dp"
+                android:text="刷新验证码"
+                android:textSize="12sp"
+                android:background="@drawable/bg_btn_secondary"
+                android:textColor="#ffffff"/>
+        </LinearLayout>
+
+        <!-- 验证码输入框 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -54,28 +93,19 @@
             android:layout_marginBottom="16dp">
             <EditText
                 android:id="@+id/etVerifyCode"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:layout_weight="1"
                 android:background="@drawable/bg_input"
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp"
-                android:hint="请输入图形验证码"
+                android:hint="请输入图中的验证码"
                 android:textColor="#ffffff"
                 android:textColorHint="#606080"
                 android:inputType="text"
-                android:layout_marginEnd="10dp"/>
-            <Button
-                android:id="@+id/btnGetSms"
-                android:layout_width="110dp"
-                android:layout_height="48dp"
-                android:text="获取验证码"
-                android:textSize="13sp"
-                android:background="@drawable/bg_btn_secondary"
-                android:textColor="#ffffff"/>
+                android:maxLength="8"/>
         </LinearLayout>
 
-        <!-- PIN码 -->
+        <!-- 短信验证码 -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -83,25 +113,41 @@
             android:textColor="#a0a0c0"
             android:textSize="13sp"
             android:layout_marginBottom="6dp"/>
-        <EditText
-            android:id="@+id/etPin"
+
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:background="@drawable/bg_input"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:hint="请输入 PIN 码"
-            android:textColor="#ffffff"
-            android:textColorHint="#606080"
-            android:inputType="number"
-            android:layout_marginBottom="24dp"/>
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+            <EditText
+                android:id="@+id/etPin"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_input"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:hint="请输入短信验证码"
+                android:textColor="#ffffff"
+                android:textColorHint="#606080"
+                android:inputType="number"
+                android:layout_marginEnd="10dp"/>
+            <Button
+                android:id="@+id/btnGetSms"
+                android:layout_width="110dp"
+                android:layout_height="48dp"
+                android:text="获取短信"
+                android:textSize="13sp"
+                android:background="@drawable/bg_btn_secondary"
+                android:textColor="#ffffff"/>
+        </LinearLayout>
 
         <!-- 登录按钮 -->
         <Button
             android:id="@+id/btnLogin"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:text="登 录"
+            android:text="登  录"
             android:textSize="16sp"
             android:textStyle="bold"
             android:background="@drawable/bg_btn_primary"
@@ -116,7 +162,8 @@
             android:text=""
             android:textColor="#e94560"
             android:textSize="13sp"
-            android:gravity="center"/>
+            android:gravity="center"
+            android:minHeight="40dp"/>
 
     </LinearLayout>
 </ScrollView>
