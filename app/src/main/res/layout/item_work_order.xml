@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#1e1e3a"
+    android:padding="10dp"
+    android:layout_marginStart="4dp"
+    android:layout_marginEnd="4dp"
+    android:layout_marginTop="3dp">
+
+    <!-- 第一行：序号 + 工单号 + 告警状态 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="4dp">
+
+        <TextView
+            android:id="@+id/tvIndex"
+            android:layout_width="28dp"
+            android:layout_height="wrap_content"
+            android:text="1"
+            android:textColor="#606080"
+            android:textSize="11sp"/>
+
+        <TextView
+            android:id="@+id/tvBillSn"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="工单号"
+            android:textColor="#e94560"
+            android:textSize="13sp"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:id="@+id/tvAlertStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="告警中"
+            android:textColor="#ff6b35"
+            android:textSize="12sp"
+            android:background="@drawable/bg_tag"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"/>
+    </LinearLayout>
+
+    <!-- 第二行：站点 + 标题 -->
+    <TextView
+        android:id="@+id/tvTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="站点名 - 工单标题"
+        android:textColor="#c0c0e0"
+        android:textSize="13sp"
+        android:layout_marginBottom="4dp"
+        android:maxLines="2"
+        android:ellipsize="end"/>
+
+    <!-- 第三行：接单人 + 创建时间 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="4dp">
+
+        <TextView
+            android:id="@+id/tvAcceptOp"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="接单人：-"
+            android:textColor="#7070a0"
+            android:textSize="11sp"/>
+
+        <TextView
+            android:id="@+id/tvCreateTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="创建：-"
+            android:textColor="#7070a0"
+            android:textSize="11sp"/>
+    </LinearLayout>
+
+    <!-- 第四行：最近处理信息 -->
+    <TextView
+        android:id="@+id/tvDealInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="#50a050"
+        android:textSize="11sp"
+        android:layout_marginBottom="4dp"
+        android:maxLines="1"
+        android:ellipsize="end"/>
+
+    <!-- 第五行：时间差 + 当前状态 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tvTimeDiff"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0分钟前"
+            android:textColor="#9090c0"
+            android:textSize="11sp"
+            android:layout_marginEnd="8dp"/>
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="--排队等待处理中..."
+            android:textColor="#e0c060"
+            android:textSize="11sp"/>
+    </LinearLayout>
+
+</LinearLayout>

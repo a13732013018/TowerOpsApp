@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#1a1a2e">
+
+    <!-- 顶部工具栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:background="#16213e"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="铁塔运维助手"
+            android:textColor="#e94560"
+            android:textSize="18sp"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:id="@+id/tvUserInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="未登录"
+            android:textColor="#a0a0c0"
+            android:textSize="12sp"/>
+    </LinearLayout>
+
+    <!-- 配置区 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#0f3460"
+        android:padding="12dp">
+
+        <!-- 功能开关 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="10dp">
+
+            <CheckBox
+                android:id="@+id/cbAutoFeedback"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="自动反馈"
+                android:textColor="#ffffff"
+                android:buttonTint="#e94560"
+                android:checked="true"/>
+
+            <CheckBox
+                android:id="@+id/cbAutoAccept"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="自动接单"
+                android:textColor="#ffffff"
+                android:buttonTint="#e94560"
+                android:checked="true"/>
+
+            <CheckBox
+                android:id="@+id/cbAutoRevert"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="自动回单"
+                android:textColor="#ffffff"
+                android:buttonTint="#e94560"
+                android:checked="false"/>
+        </LinearLayout>
+
+        <!-- 阈值设置 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="反馈阈值(分钟):"
+                android:textColor="#a0a0c0"
+                android:textSize="12sp"/>
+            <EditText
+                android:id="@+id/etFeedbackMin"
+                android:layout_width="50dp"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_input"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:text="30"
+                android:textColor="#ffffff"
+                android:textSize="12sp"
+                android:inputType="number"
+                android:gravity="center"
+                android:layout_marginStart="6dp"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" ~ "
+                android:textColor="#a0a0c0"/>
+            <EditText
+                android:id="@+id/etFeedbackMax"
+                android:layout_width="50dp"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_input"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:text="60"
+                android:textColor="#ffffff"
+                android:textSize="12sp"
+                android:inputType="number"
+                android:gravity="center"
+                android:layout_marginEnd="16dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="接单阈值:"
+                android:textColor="#a0a0c0"
+                android:textSize="12sp"/>
+            <EditText
+                android:id="@+id/etAcceptMin"
+                android:layout_width="50dp"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_input"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:text="5"
+                android:textColor="#ffffff"
+                android:textSize="12sp"
+                android:inputType="number"
+                android:gravity="center"
+                android:layout_marginStart="6dp"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" ~ "
+                android:textColor="#a0a0c0"/>
+            <EditText
+                android:id="@+id/etAcceptMax"
+                android:layout_width="50dp"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_input"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:text="15"
+                android:textColor="#ffffff"
+                android:textSize="12sp"
+                android:inputType="number"
+                android:gravity="center"/>
+        </LinearLayout>
+
+        <!-- 轮询间隔 & 控制按钮 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="轮询(秒):"
+                android:textColor="#a0a0c0"
+                android:textSize="12sp"/>
+            <EditText
+                android:id="@+id/etIntervalMin"
+                android:layout_width="50dp"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_input"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:text="30"
+                android:textColor="#ffffff"
+                android:textSize="12sp"
+                android:inputType="number"
+                android:gravity="center"
+                android:layout_marginStart="6dp"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" ~ "
+                android:textColor="#a0a0c0"/>
+            <EditText
+                android:id="@+id/etIntervalMax"
+                android:layout_width="50dp"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_input"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:text="60"
+                android:textColor="#ffffff"
+                android:textSize="12sp"
+                android:inputType="number"
+                android:gravity="center"
+                android:layout_marginEnd="12dp"/>
+
+            <Button
+                android:id="@+id/btnStartMonitor"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:text="开始监控"
+                android:textSize="13sp"
+                android:background="@drawable/bg_btn_primary"
+                android:textColor="#ffffff"
+                android:layout_marginEnd="6dp"/>
+
+            <Button
+                android:id="@+id/btnStopMonitor"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:text="停止"
+                android:textSize="13sp"
+                android:background="@drawable/bg_btn_secondary"
+                android:textColor="#ffffff"/>
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- 进度条 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:background="#0a0a1a"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tvProgress"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="就绪"
+            android:textColor="#a0a0c0"
+            android:textSize="12sp"/>
+
+        <TextView
+            android:id="@+id/tvNextRun"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#606080"
+            android:textSize="11sp"/>
+    </LinearLayout>
+
+    <!-- 工单列表 -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerOrders"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#12122a"
+        android:clipToPadding="false"
+        android:paddingBottom="8dp"/>
+
+</LinearLayout>

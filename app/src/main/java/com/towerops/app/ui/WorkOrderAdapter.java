@@ -1,0 +1,107 @@
+package com.towerops.app.ui;
+
+import android.graphics.Color;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.towerops.app.R;
+import com.towerops.app.model.WorkOrder;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class WorkOrderAdapter extends RecyclerView.Adapter<WorkOrderAdapter.VH> {
+
+    private final List<WorkOrder> data = new ArrayList<>();
+
+    public void setData(List<WorkOrder> list) {
+        data.clear();
+        data.addAll(list);
+        notifyDataSetChanged();
+    }
+
+    /** 按 billsn 更新某行的状态列 */
+    public void updateStatus(int rowHint, String billsn, String content) {
+        // 快速路径
+        if (rowHint >= 0 && rowHint < data.size()
+                && billsn.equals(data.get(rowHint).billsn)) {
+            data.get(rowHint).statusCol = content;
+            notifyItemChanged(rowHint);
+            return;
+        }
+        // 全表搜索
+        for (int i = 0; i < data.size(); i++) {
+            if (billsn.equals(data.get(i).billsn)) {
+                data.get(i).statusCol = content;
+                notifyItemChanged(i);
+                return;
+            }
+        }
+    }
+
+    @NonNull
+    @Override
+    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View v = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_work_order, parent, false);
+        return new VH(v);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull VH h, int pos) {
+        WorkOrder wo = data.get(pos);
+        h.tvIndex.setText(String.valueOf(wo.index));
+        h.tvBillSn.setText(wo.billsn);
+        h.tvTitle.setText(wo.stationname + "  " + wo.billtitle);
+        h.tvAcceptOp.setText("接单：" + (wo.acceptOperator.isEmpty() ? "未接单" : wo.acceptOperator));
+        h.tvCreateTime.setText(wo.createTime.length() > 16 ? wo.createTime.substring(0, 16) : wo.createTime);
+        h.tvDealInfo.setText(wo.dealInfo.isEmpty() ? "" : "处理：" + wo.dealInfo);
+        h.tvTimeDiff.setText(wo.timeDiff1 + "分钟");
+        h.tvStatus.setText(wo.statusCol == null ? "" : wo.statusCol);
+
+        // 告警状态颜色
+        if ("告警中".equals(wo.alertStatus)) {
+            h.tvAlertStatus.setText("⚡告警中");
+            h.tvAlertStatus.setTextColor(Color.parseColor("#ff6b35"));
+        } else {
+            h.tvAlertStatus.setText("✓已恢复");
+            h.tvAlertStatus.setTextColor(Color.parseColor("#40c080"));
+        }
+
+        // 状态列颜色
+        String sc = wo.statusCol == null ? "" : wo.statusCol;
+        if (sc.contains("成功") || sc.contains("完毕")) {
+            h.tvStatus.setTextColor(Color.parseColor("#40c080"));
+        } else if (sc.contains("失败") || sc.contains("异常") || sc.contains("拦截")) {
+            h.tvStatus.setTextColor(Color.parseColor("#e94560"));
+        } else {
+            h.tvStatus.setTextColor(Color.parseColor("#e0c060"));
+        }
+    }
+
+    @Override
+    public int getItemCount() { return data.size(); }
+
+    static class VH extends RecyclerView.ViewHolder {
+        TextView tvIndex, tvBillSn, tvAlertStatus, tvTitle,
+                 tvAcceptOp, tvCreateTime, tvDealInfo, tvTimeDiff, tvStatus;
+
+        VH(View v) {
+            super(v);
+            tvIndex       = v.findViewById(R.id.tvIndex);
+            tvBillSn      = v.findViewById(R.id.tvBillSn);
+            tvAlertStatus = v.findViewById(R.id.tvAlertStatus);
+            tvTitle       = v.findViewById(R.id.tvTitle);
+            tvAcceptOp    = v.findViewById(R.id.tvAcceptOp);
+            tvCreateTime  = v.findViewById(R.id.tvCreateTime);
+            tvDealInfo    = v.findViewById(R.id.tvDealInfo);
+            tvTimeDiff    = v.findViewById(R.id.tvTimeDiff);
+            tvStatus      = v.findViewById(R.id.tvStatus);
+        }
+    }
+}

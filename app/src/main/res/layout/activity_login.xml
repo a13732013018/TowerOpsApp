@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#1a1a2e"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- 标题 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="铁塔运维助手"
+            android:textSize="24sp"
+            android:textColor="#e94560"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="24dp"/>
+
+        <!-- 账号选择 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="选择账号"
+            android:textColor="#a0a0c0"
+            android:textSize="13sp"
+            android:layout_marginBottom="6dp"/>
+        <Spinner
+            android:id="@+id/spinnerAccount"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_input"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- 图形验证码 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="图形验证码"
+            android:textColor="#a0a0c0"
+            android:textSize="13sp"
+            android:layout_marginBottom="6dp"/>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+            <EditText
+                android:id="@+id/etVerifyCode"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_input"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:hint="请输入图形验证码"
+                android:textColor="#ffffff"
+                android:textColorHint="#606080"
+                android:inputType="text"
+                android:layout_marginEnd="10dp"/>
+            <Button
+                android:id="@+id/btnGetSms"
+                android:layout_width="110dp"
+                android:layout_height="48dp"
+                android:text="获取验证码"
+                android:textSize="13sp"
+                android:background="@drawable/bg_btn_secondary"
+                android:textColor="#ffffff"/>
+        </LinearLayout>
+
+        <!-- PIN码 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="短信验证码 / PIN码"
+            android:textColor="#a0a0c0"
+            android:textSize="13sp"
+            android:layout_marginBottom="6dp"/>
+        <EditText
+            android:id="@+id/etPin"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_input"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:hint="请输入 PIN 码"
+            android:textColor="#ffffff"
+            android:textColorHint="#606080"
+            android:inputType="number"
+            android:layout_marginBottom="24dp"/>
+
+        <!-- 登录按钮 -->
+        <Button
+            android:id="@+id/btnLogin"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="登 录"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_btn_primary"
+            android:textColor="#ffffff"
+            android:layout_marginBottom="12dp"/>
+
+        <!-- 状态提示 -->
+        <TextView
+            android:id="@+id/tvLoginStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#e94560"
+            android:textSize="13sp"
+            android:gravity="center"/>
+
+    </LinearLayout>
+</ScrollView>
