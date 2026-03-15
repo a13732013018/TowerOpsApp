@@ -27,14 +27,12 @@ public class WorkOrderAdapter extends RecyclerView.Adapter<WorkOrderAdapter.VH> 
 
     /** 按 billsn 更新某行的状态列 */
     public void updateStatus(int rowHint, String billsn, String content) {
-        // 快速路径
         if (rowHint >= 0 && rowHint < data.size()
                 && billsn.equals(data.get(rowHint).billsn)) {
             data.get(rowHint).statusCol = content;
             notifyItemChanged(rowHint);
             return;
         }
-        // 全表搜索
         for (int i = 0; i < data.size(); i++) {
             if (billsn.equals(data.get(i).billsn)) {
                 data.get(i).statusCol = content;
@@ -61,7 +59,14 @@ public class WorkOrderAdapter extends RecyclerView.Adapter<WorkOrderAdapter.VH> 
         h.tvAcceptOp.setText("接单：" + (wo.acceptOperator.isEmpty() ? "未接单" : wo.acceptOperator));
         h.tvCreateTime.setText(wo.createTime.length() > 16 ? wo.createTime.substring(0, 16) : wo.createTime);
         h.tvDealInfo.setText(wo.dealInfo.isEmpty() ? "" : "处理：" + wo.dealInfo);
-        h.tvTimeDiff.setText(wo.timeDiff1 + "分钟");
+        // 工单历时（从创建到现在）
+        h.tvTimeDiff2.setText("工单历时：" + formatMinutes(wo.timeDiff2));
+        // 距上次反馈（有最近操作时间则用timeDiff1，否则显示未反馈）
+        if (wo.lastOperateTime != null && !wo.lastOperateTime.isEmpty()) {
+            h.tvTimeDiff.setText("距上次反馈：" + formatMinutes(wo.timeDiff1));
+        } else {
+            h.tvTimeDiff.setText("距上次反馈：未反馈");
+        }
         h.tvStatus.setText(wo.statusCol == null ? "" : wo.statusCol);
 
         // 告警状态颜色
@@ -89,7 +94,8 @@ public class WorkOrderAdapter extends RecyclerView.Adapter<WorkOrderAdapter.VH> 
 
     static class VH extends RecyclerView.ViewHolder {
         TextView tvIndex, tvBillSn, tvAlertStatus, tvTitle,
-                 tvAcceptOp, tvCreateTime, tvDealInfo, tvTimeDiff, tvStatus;
+                 tvAcceptOp, tvCreateTime, tvDealInfo,
+                 tvTimeDiff2, tvTimeDiff, tvStatus;
 
         VH(View v) {
             super(v);
@@ -100,8 +106,18 @@ public class WorkOrderAdapter extends RecyclerView.Adapter<WorkOrderAdapter.VH> 
             tvAcceptOp    = v.findViewById(R.id.tvAcceptOp);
             tvCreateTime  = v.findViewById(R.id.tvCreateTime);
             tvDealInfo    = v.findViewById(R.id.tvDealInfo);
+            tvTimeDiff2   = v.findViewById(R.id.tvTimeDiff2);
             tvTimeDiff    = v.findViewById(R.id.tvTimeDiff);
             tvStatus      = v.findViewById(R.id.tvStatus);
         }
+    }
+
+    /** 将分钟数格式化为可读字符串，如 125分钟 → 2小时5分钟 */
+    private static String formatMinutes(int minutes) {
+        if (minutes <= 0) return "0分钟";
+        if (minutes < 60) return minutes + "分钟";
+        int h = minutes / 60;
+        int m = minutes % 60;
+        return m == 0 ? h + "小时" : h + "小时" + m + "分钟";
     }
 }
