@@ -17,11 +17,13 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class WorkerTask implements Runnable {
 
+    // 串行网络发包锁（对应 集_网络发包许可证）
     public static final ReentrantLock NET_LOCK = new ReentrantLock(true);
 
     private final int    taskIndex;
     private final Random random = new Random();
 
+    /** UI 回调接口（主线程更新列表） */
     public interface UiCallback {
         void updateStatus(int rowIndex, String billsn, String content);
     }
@@ -38,6 +40,7 @@ public class WorkerTask implements Runnable {
     public void run() {
         Session s = Session.get();
 
+        // 解包任务参数（对应 分割文本 + 字符(1) 分隔）
         String pack = s.taskArray[taskIndex];
         if (pack == null || pack.isEmpty()) { s.releaseSlot(); return; }
 
@@ -56,6 +59,7 @@ public class WorkerTask implements Runnable {
         int    timeDiff2       = parseInt(parts[9]);
         int    rowIndex        = parseInt(parts[10]);
 
+        // 解包配置参数
         String[] cfg = s.appConfig.split("\u0001", -1);
         if (cfg.length < 5) { s.releaseSlot(); return; }
 
@@ -77,9 +81,12 @@ public class WorkerTask implements Runnable {
         boolean hasAction = false;
 
         // ==================== 场景一：自动反馈 ====================
+        // 条件：taskId非空（工单存在）+ 距上次操作 >= 阈值分钟 + 未处理过发电
+        // 说明：不限制接单人是谁，只要工单存在且超时未反馈，均可追加描述
+        //       原易语言逻辑：不判断接单人，只要工单在列表里就反馈
         if (enable反馈
-                && !acceptOperator.isEmpty()
-                && timeDiff1 >= 阈值反馈          // ← >= 修复边界条件
+                && !taskId.isEmpty()           // 工单taskId有效即可，不限制接单人
+                && timeDiff1 >= 阈值反馈
                 && !dealInfo.contains("无需发电")
                 && !dealInfo.contains("发电中")) {
 
@@ -106,9 +113,10 @@ public class WorkerTask implements Runnable {
         }
 
         // ==================== 场景二：自动接单 ====================
+        // 条件：未接单（acceptOperator为空）+ 距创建时间 >= 阈值分钟
         if (enable接单
                 && acceptOperator.isEmpty()
-                && timeDiff2 >= 阈值接单) {       // ← >= 修复边界条件
+                && timeDiff2 >= 阈值接单) {
 
             hasAction = true;
             postUi(rowIndex, billsn, "准备接单[" + timeDiff2 + "≥" + 阈值接单 + "min]...");
@@ -155,6 +163,7 @@ public class WorkerTask implements Runnable {
                 String recoveryTime = left(getPath(detailJson, "model.recovery_time"), 16);
                 String operateEndTime = "";
 
+                // 找 ISSTAND 或 ELECTRIC_JUDGE 的 operate_end_time
                 try {
                     org.json.JSONArray actionList = detailJson.getJSONArray("actionList");
                     for (int p = 0; p < actionList.length(); p++) {
@@ -193,6 +202,7 @@ public class WorkerTask implements Runnable {
                     postUi(rowIndex, billsn, "等待页面刷新...");
                     sleep(randInt(3000, 5000));
 
+                    // 刷新详情，获取新 taskId
                     String detailStr2 = WorkOrderApi.getBillDetail(billsn);
                     try {
                         JSONObject d2 = new JSONObject(detailStr2);
@@ -211,6 +221,7 @@ public class WorkerTask implements Runnable {
                         }
                     } catch (Exception ignored) {}
 
+                    // 判断时间间隔 > 0 才回单
                     if (!operateEndTime.isEmpty()) {
                         String normalizedOet = operateEndTime.substring(0, Math.min(19, operateEndTime.length()))
                                 .replace("-", "/");
@@ -224,6 +235,7 @@ public class WorkerTask implements Runnable {
                         }
                     }
 
+                    // 免发电特殊处理
                     if (detailStr.contains("停电告警已经清除不需要发电")) {
                         postUi(rowIndex, billsn, "检测到免发电，提交回单...");
                         sleep(randInt(3000, 6000));
@@ -246,12 +258,15 @@ public class WorkerTask implements Runnable {
             }
         }
 
+        // 兜底显示
         if (!hasAction) {
             postUi(rowIndex, billsn, "-- 暂无需要操作 --");
         }
 
         s.releaseSlot();
     }
+
+    // ---- 辅助方法 ----
 
     private void postUi(int row, String billsn, String msg) {
         mainHandler.post(() -> uiCallback.updateStatus(row, billsn, msg));
