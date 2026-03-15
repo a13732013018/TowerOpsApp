@@ -13,8 +13,17 @@
     <!-- WakeLock：防止 CPU 休眠 -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- 开机自启（可选，手动授权后生效） -->
+    <!-- 开机自启（需在系统设置中手动授权） -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!--
+        精确闹钟权限：
+        Android 12（API 31）以下：SCHEDULE_EXACT_ALARM 默认授予
+        Android 12+：用户需在"特殊应用权限"中手动开启"闹钟和提醒"
+    -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Android 13+ 备用权限（不需要用户手动授权，降级精确度，但仍可触发） -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <application
         android:allowBackup="true"
@@ -41,12 +50,34 @@
             android:exported="false"
             android:screenOrientation="portrait" />
 
-        <!-- 前台服务：系统不会随意杀掉，START_STICKY 被杀后自动重启 -->
+        <!--
+            前台服务：
+            - stopWithTask="false"：从最近任务划掉 APP 后服务不停止
+            - foregroundServiceType="dataSync"：Android 14+ 必填
+        -->
         <service
             android:name=".worker.MonitorService"
             android:exported="false"
             android:foregroundServiceType="dataSync"
             android:stopWithTask="false" />
+
+        <!--
+            开机自启接收器：
+            - exported="true" 必须为 true，否则系统广播收不到
+            - enabled="true" 确保默认启用
+        -->
+        <receiver
+            android:name=".worker.BootReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <!-- 标准开机广播 -->
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!-- 华为/HTC 快速启动 -->
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
 
     </application>
 
