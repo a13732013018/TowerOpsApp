@@ -17,13 +17,11 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class WorkerTask implements Runnable {
 
-    // 串行网络发包锁（对应 集_网络发包许可证）
     public static final ReentrantLock NET_LOCK = new ReentrantLock(true);
 
     private final int    taskIndex;
     private final Random random = new Random();
 
-    /** UI 回调接口（主线程更新列表） */
     public interface UiCallback {
         void updateStatus(int rowIndex, String billsn, String content);
     }
@@ -40,7 +38,6 @@ public class WorkerTask implements Runnable {
     public void run() {
         Session s = Session.get();
 
-        // 解包任务参数（对应 分割文本 + 字符(1) 分隔）
         String pack = s.taskArray[taskIndex];
         if (pack == null || pack.isEmpty()) { s.releaseSlot(); return; }
 
@@ -59,7 +56,6 @@ public class WorkerTask implements Runnable {
         int    timeDiff2       = parseInt(parts[9]);
         int    rowIndex        = parseInt(parts[10]);
 
-        // 解包配置参数
         String[] cfg = s.appConfig.split("\u0001", -1);
         if (cfg.length < 5) { s.releaseSlot(); return; }
 
@@ -83,21 +79,27 @@ public class WorkerTask implements Runnable {
         // ==================== 场景一：自动反馈 ====================
         if (enable反馈
                 && !acceptOperator.isEmpty()
-                && timeDiff1 > 阈值反馈
+                && timeDiff1 >= 阈值反馈          // ← >= 修复边界条件
                 && !dealInfo.contains("无需发电")
                 && !dealInfo.contains("发电中")) {
 
             hasAction = true;
-            postUi(rowIndex, billsn, "准备反馈：等待操作空闲...");
+            postUi(rowIndex, billsn, "准备反馈[" + timeDiff1 + "≥" + 阈值反馈 + "min]...");
             NET_LOCK.lock();
             try {
                 postUi(rowIndex, billsn, "正在填写反馈内容...");
                 sleep(randInt(5000, 10000));
 
-                String comment = billtitle.contains("停电") ? "故障停电" : "站点设备故障";
-                WorkOrderApi.addRemark(taskId, comment, billsn);
+                String comment = (billtitle.contains("停电") || billtitle.contains("断电"))
+                        ? "故障停电，联系电力部门处理中"
+                        : "站点设备故障，正在处理中";
+                String remarkResult = WorkOrderApi.addRemark(taskId, comment, billsn);
 
-                postUi(rowIndex, billsn, "反馈执行完毕");
+                if (remarkResult.contains("OK") || remarkResult.contains("success")) {
+                    postUi(rowIndex, billsn, "反馈成功 ✓");
+                } else {
+                    postUi(rowIndex, billsn, "反馈完毕:" + remarkResult.substring(0, Math.min(40, remarkResult.length())));
+                }
             } finally {
                 NET_LOCK.unlock();
             }
@@ -106,18 +108,22 @@ public class WorkerTask implements Runnable {
         // ==================== 场景二：自动接单 ====================
         if (enable接单
                 && acceptOperator.isEmpty()
-                && timeDiff2 > 阈值接单) {
+                && timeDiff2 >= 阈值接单) {       // ← >= 修复边界条件
 
             hasAction = true;
-            postUi(rowIndex, billsn, "准备接单：等待操作空闲...");
+            postUi(rowIndex, billsn, "准备接单[" + timeDiff2 + "≥" + 阈值接单 + "min]...");
             NET_LOCK.lock();
             try {
                 postUi(rowIndex, billsn, "阅读工单详情中...");
                 sleep(randInt(2000, 4000));
                 postUi(rowIndex, billsn, "点击接单...");
                 sleep(randInt(1000, 2000));
-                WorkOrderApi.acceptBill(billid, billsn, taskId);
-                postUi(rowIndex, billsn, "接单执行完毕");
+                String acceptResult = WorkOrderApi.acceptBill(billid, billsn, taskId);
+                if (acceptResult.contains("OK") || acceptResult.contains("success")) {
+                    postUi(rowIndex, billsn, "接单成功 ✓");
+                } else {
+                    postUi(rowIndex, billsn, "接单完毕:" + acceptResult.substring(0, Math.min(40, acceptResult.length())));
+                }
             } finally {
                 NET_LOCK.unlock();
             }
@@ -149,7 +155,6 @@ public class WorkerTask implements Runnable {
                 String recoveryTime = left(getPath(detailJson, "model.recovery_time"), 16);
                 String operateEndTime = "";
 
-                // 找 ISSTAND 或 ELECTRIC_JUDGE 的 operate_end_time
                 try {
                     org.json.JSONArray actionList = detailJson.getJSONArray("actionList");
                     for (int p = 0; p < actionList.length(); p++) {
@@ -188,7 +193,6 @@ public class WorkerTask implements Runnable {
                     postUi(rowIndex, billsn, "等待页面刷新...");
                     sleep(randInt(3000, 5000));
 
-                    // 刷新详情，获取新 taskId
                     String detailStr2 = WorkOrderApi.getBillDetail(billsn);
                     try {
                         JSONObject d2 = new JSONObject(detailStr2);
@@ -207,7 +211,6 @@ public class WorkerTask implements Runnable {
                         }
                     } catch (Exception ignored) {}
 
-                    // 判断时间间隔 > 0 才回单
                     if (!operateEndTime.isEmpty()) {
                         String normalizedOet = operateEndTime.substring(0, Math.min(19, operateEndTime.length()))
                                 .replace("-", "/");
@@ -221,7 +224,6 @@ public class WorkerTask implements Runnable {
                         }
                     }
 
-                    // 免发电特殊处理
                     if (detailStr.contains("停电告警已经清除不需要发电")) {
                         postUi(rowIndex, billsn, "检测到免发电，提交回单...");
                         sleep(randInt(3000, 6000));
@@ -244,15 +246,12 @@ public class WorkerTask implements Runnable {
             }
         }
 
-        // 兜底显示
         if (!hasAction) {
             postUi(rowIndex, billsn, "-- 暂无需要操作 --");
         }
 
         s.releaseSlot();
     }
-
-    // ---- 辅助方法 ----
 
     private void postUi(int row, String billsn, String msg) {
         mainHandler.post(() -> uiCallback.updateStatus(row, billsn, msg));
