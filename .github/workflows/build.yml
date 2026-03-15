@@ -39,7 +39,7 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
           restore-keys: ${{ runner.os }}-gradle-
 
-             - name: Fix line endings and permissions
+      - name: Fix line endings and permissions
         run: |
           sed -i 's/\r$//' gradlew
           chmod +x gradlew
