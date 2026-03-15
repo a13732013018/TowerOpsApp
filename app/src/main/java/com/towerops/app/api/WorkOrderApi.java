@@ -20,9 +20,6 @@ public class WorkOrderApi {
 
     private static final String BASE = "http://ywapp.chinatowercom.cn:58090/itower/mobile/app/service";
 
-    // =====================================================================
-    // 1. 获取工单监控列表
-    // =====================================================================
     public static String getBillMonitorList() {
         Session s    = Session.get();
         String ts    = TimeUtil.getCurrentTimestamp();
@@ -35,9 +32,6 @@ public class WorkOrderApi {
         return HttpUtil.post(url, post, s.authHeader, null);
     }
 
-    // =====================================================================
-    // 2. 获取工单告警信息（判断是否告警中）
-    // =====================================================================
     public static String getBillAlarmList(String billSn) {
         Session s   = Session.get();
         String ts   = TimeUtil.getCurrentTimestamp();
@@ -52,9 +46,6 @@ public class WorkOrderApi {
         return HttpUtil.post(url, post, s.authHeader, null);
     }
 
-    // =====================================================================
-    // 3. 获取工单详情页面
-    // =====================================================================
     public static String getBillDetail(String billSn) {
         Session s   = Session.get();
         String ts   = TimeUtil.getCurrentTimestamp();
@@ -69,9 +60,6 @@ public class WorkOrderApi {
         return HttpUtil.post(url, post, s.authHeader, null);
     }
 
-    // =====================================================================
-    // 4. 故障反馈（追加描述）
-    // =====================================================================
     public static String addRemark(String taskId, String comment, String billSn) {
         Session s   = Session.get();
         String ts   = TimeUtil.getCurrentTimestamp();
@@ -87,18 +75,16 @@ public class WorkOrderApi {
         return HttpUtil.post(url, post, s.authHeader, null);
     }
 
-    // =====================================================================
-    // 5. 自动接单
-    // =====================================================================
     public static String acceptBill(String billId, String billSn, String taskId) {
         Session s   = Session.get();
         String ts   = TimeUtil.getCurrentTimestamp();
         String url  = BASE + "?porttype=SET_BILL_ACCEPT&v=1.0.93&userid=" + s.userid + "&c=0";
+        // billStatus=1 表示接单成功（原来错误地传了0=未接单）
         String post = "userID="     + s.userid
                 + "&billId="        + billId
                 + "&billSn="        + billSn
                 + "&taskId="        + taskId
-                + "&billStatus=0"
+                + "&billStatus=1"
                 + "&faultCouse=%E6%89%8B%E6%9C%BA%E6%8E%A5%E5%8D%95"
                 + "&handlerResult=%E6%89%8B%E6%9C%BA%E6%8E%A5%E5%8D%95"
                 + "&c_timestamp="   + ts
@@ -108,9 +94,6 @@ public class WorkOrderApi {
         return HttpUtil.post(url, post, s.authHeader, null);
     }
 
-    // =====================================================================
-    // 6. 上站判断（选择不上站）
-    // =====================================================================
     public static String stationStatus(String taskId, String standCause, String billSn) {
         Session s   = Session.get();
         String ts   = TimeUtil.getCurrentTimestamp();
@@ -127,9 +110,6 @@ public class WorkOrderApi {
         return HttpUtil.post(url, post, s.authHeader, null);
     }
 
-    // =====================================================================
-    // 7. 发电判断
-    // =====================================================================
     public static String electricJudge(String billSn, String dealComment,
                                        String billId, String taskId) {
         Session s   = Session.get();
@@ -147,9 +127,6 @@ public class WorkOrderApi {
         return HttpUtil.post(url, post, s.authHeader, null);
     }
 
-    // =====================================================================
-    // 8. 终审回单
-    // =====================================================================
     public static String revertBill(String faultType, String faultCouse,
                                     String handlerResult, String billId,
                                     String billSn, String taskId,
@@ -157,7 +134,6 @@ public class WorkOrderApi {
         Session s   = Session.get();
         String ts   = TimeUtil.getCurrentTimestamp();
 
-        // 回单接口需要带 Authorization token，单独构建协议头
         String extraHeader = "Authorization: " + s.token + "\n"
                 + "equiptoken: \n"
                 + "appVer: 202112\n"
@@ -185,9 +161,6 @@ public class WorkOrderApi {
         return HttpUtil.post(url, post, extraHeader, null);
     }
 
-    // =====================================================================
-    // 工具：URL 编码（UTF-8）
-    // =====================================================================
     public static String urlEncUtf8(String s) {
         try {
             return URLEncoder.encode(s, "UTF-8");
@@ -196,9 +169,6 @@ public class WorkOrderApi {
         }
     }
 
-    // =====================================================================
-    // 工具：从 JSON 字符串中提取嵌套属性（兼容 "user.mobilephone" 语法）
-    // =====================================================================
     public static String getJsonPath(JSONObject root, String path) {
         try {
             String[] parts = path.split("\\.");
@@ -212,9 +182,6 @@ public class WorkOrderApi {
         }
     }
 
-    // =====================================================================
-    // 工具：计算两个时间字符串的分钟差（对应 取时间间隔()）
-    // =====================================================================
     public static int minutesDiff(String timeStr) {
         if (timeStr == null || timeStr.isEmpty()) return 0;
         try {
