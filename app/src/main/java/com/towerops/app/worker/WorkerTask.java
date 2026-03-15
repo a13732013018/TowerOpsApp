@@ -221,12 +221,11 @@ public class WorkerTask implements Runnable {
                         }
                     } catch (Exception ignored) {}
 
-                    // 判断时间间隔 > 0 才回单
+                    // 有 operateEndTime 就执行回单（minutesDiff 能解析说明时间合法）
                     if (!operateEndTime.isEmpty()) {
-                        String normalizedOet = operateEndTime.substring(0, Math.min(19, operateEndTime.length()))
-                                .replace("-", "/");
-                        int diffMin = WorkOrderApi.minutesDiff(normalizedOet);
-                        if (diffMin > 0) {
+                        // 直接传原始字符串，minutesDiff 内部已兼容所有格式，无需手动转换
+                        int diffMin = WorkOrderApi.minutesDiff(operateEndTime);
+                        if (diffMin >= 0) {
                             postUi(rowIndex, billsn, "正在填写终审回单...");
                             sleep(randInt(5000, 9000));
                             WorkOrderApi.revertBill(faultType, faultCouse, handlerResult,
