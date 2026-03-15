@@ -1,3 +1,4 @@
+
 package com.towerops.app.ui;
 
 import android.graphics.Color;
@@ -27,12 +28,14 @@ public class WorkOrderAdapter extends RecyclerView.Adapter<WorkOrderAdapter.VH> 
 
     /** 按 billsn 更新某行的状态列 */
     public void updateStatus(int rowHint, String billsn, String content) {
+        // 快速路径
         if (rowHint >= 0 && rowHint < data.size()
                 && billsn.equals(data.get(rowHint).billsn)) {
             data.get(rowHint).statusCol = content;
             notifyItemChanged(rowHint);
             return;
         }
+        // 全表搜索
         for (int i = 0; i < data.size(); i++) {
             if (billsn.equals(data.get(i).billsn)) {
                 data.get(i).statusCol = content;
@@ -61,11 +64,14 @@ public class WorkOrderAdapter extends RecyclerView.Adapter<WorkOrderAdapter.VH> 
         h.tvDealInfo.setText(wo.dealInfo.isEmpty() ? "" : "处理：" + wo.dealInfo);
         // 工单历时（从创建到现在）
         h.tvTimeDiff2.setText("工单历时：" + formatMinutes(wo.timeDiff2));
-        // 距上次反馈（有最近操作时间则用timeDiff1，否则显示未反馈）
+        // 距上次反馈：显示具体时间 + 经过分钟数，两段信息都展示
         if (wo.lastOperateTime != null && !wo.lastOperateTime.isEmpty()) {
-            h.tvTimeDiff.setText("距上次反馈：" + formatMinutes(wo.timeDiff1));
+            // 截取时间到分钟（最多16位），如 "2026-03-15 14:30"
+            String showTime = wo.lastOperateTime.length() > 16
+                    ? wo.lastOperateTime.substring(0, 16) : wo.lastOperateTime;
+            h.tvTimeDiff.setText("上次反馈：" + showTime + "（" + formatMinutes(wo.timeDiff1) + "前）");
         } else {
-            h.tvTimeDiff.setText("距上次反馈：未反馈");
+            h.tvTimeDiff.setText("上次反馈：尚未反馈");
         }
         h.tvStatus.setText(wo.statusCol == null ? "" : wo.statusCol);
 
