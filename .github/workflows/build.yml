@@ -42,7 +42,11 @@ jobs:
       - name: Fix line endings and permissions
         run: |
           sed -i 's/\r$//' gradlew
+          sed -i 's/\r$//' gradlew.bat
+          sed -i 's/\r$//' gradle/wrapper/gradle-wrapper.properties
+          find . -name "*.gradle" -exec sed -i 's/\r$//' {} \;
           chmod +x gradlew
+
 
 
 
