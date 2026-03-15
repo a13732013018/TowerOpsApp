@@ -19,39 +19,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download gradle-wrapper.jar
-        run: |
-          mkdir -p gradle/wrapper
-          curl -L "https://github.com/gradle/gradle/raw/v8.4.0/gradle/wrapper/gradle-wrapper.jar" \
-            -o gradle/wrapper/gradle-wrapper.jar || \
-          wget -q "https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradle/wrapper/gradle-wrapper.jar" \
-            -O gradle/wrapper/gradle-wrapper.jar || \
-          curl -L "https://services.gradle.org/distributions/gradle-8.4-bin.zip" -o /tmp/gradle.zip && \
-          cd /tmp && unzip -q gradle.zip && \
-          cp gradle-8.4/lib/gradle-wrapper-*.jar $GITHUB_WORKSPACE/gradle/wrapper/gradle-wrapper.jar || true
-
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
-          restore-keys: ${{ runner.os }}-gradle-
-
-      - name: Fix line endings and permissions
-        run: |
-          sed -i 's/\r$//' gradlew
-          sed -i 's/\r$//' gradlew.bat
-          sed -i 's/\r$//' gradle/wrapper/gradle-wrapper.properties
-          find . -name "*.gradle" -exec sed -i 's/\r$//' {} \;
-          chmod +x gradlew
-
-
-
+          gradle-version: '8.4'
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
