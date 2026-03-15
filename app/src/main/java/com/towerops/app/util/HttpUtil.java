@@ -78,4 +78,35 @@ public class HttpUtil {
     public static String post(String url, String post) {
         return post(url, post, null, null);
     }
+
+    /**
+     * GET 请求，返回字节数组（用于图片等二进制内容）
+     * 同时会自动将响应的 Set-Cookie 存入 CookieStore
+     */
+    public static byte[] getBytes(String url) {
+        try {
+            Request request = new Request.Builder()
+                    .url(url.trim())
+                    .get()
+                    .header("User-Agent", "okhttp/4.10.0")
+                    .header("Connection", "Keep-Alive")
+                    .build();
+
+            try (okhttp3.Response response = CLIENT.newCall(request).execute()) {
+                // 提取并保存 Cookie
+                String setCookie = response.header("Set-Cookie");
+                if (setCookie != null && !setCookie.isEmpty()) {
+                    // 取 name=value 部分（分号前）
+                    String cookiePart = setCookie.split(";")[0].trim();
+                    com.towerops.app.util.CookieStore.saveCookie(cookiePart);
+                }
+                if (response.body() != null) {
+                    return response.body().bytes();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 }
