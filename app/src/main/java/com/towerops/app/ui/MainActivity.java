@@ -119,8 +119,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // 回到前台时重新注册回调，保证 UI 刷新
         if (serviceBound && monitorService != null) {
+            // 重新注册回调（setCallback内部会主动推送一次倒计时给UI）
             monitorService.setCallback(serviceCallback);
             syncButtonState();
         }
@@ -129,7 +129,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        // 退到后台时解除回调，避免内存泄漏（服务继续跑，只是不刷 UI）
+        // ★ 退到后台只解除UI回调引用，服务本身继续全速运行 ★
+        // ★ 不再置null——改为传入一个"静默回调"，避免callback==null时UI恢复慢 ★
         if (serviceBound && monitorService != null) {
             monitorService.setCallback(null);
         }
