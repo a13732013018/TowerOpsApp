@@ -156,12 +156,23 @@ public class MonitorTask implements Runnable {
         wo.createTime  = item.optString("createtime",  "");
         wo.stationname = item.optString("stationname", "");
         wo.billtitle   = item.optString("billtitle",   "");
-        wo.billid      = item.optString("billid",      "");
+        // billid：同样先取顶层，取不到去 mode 里找
+        wo.billid = normalizeStr(item.optString("billid", ""));
+        if (wo.billid.isEmpty()) {
+            JSONObject modeBill = item.optJSONObject("mode");
+            if (modeBill != null) wo.billid = normalizeStr(modeBill.optString("billid", ""));
+        }
 
-        // taskId：直接从列表字段取（兼容 taskid / taskId 大小写）
+        // taskId：先取顶层字段（兼容 taskid / taskId 大小写），
+        // 取不到再去 mode 嵌套对象里找（监控列表待接单工单的 taskid 可能只在 mode 里）
         wo.taskId = normalizeStr(item.optString("taskid", ""));
+        if (wo.taskId.isEmpty()) wo.taskId = normalizeStr(item.optString("taskId", ""));
         if (wo.taskId.isEmpty()) {
-            wo.taskId = normalizeStr(item.optString("taskId", ""));
+            JSONObject mode = item.optJSONObject("mode");
+            if (mode != null) {
+                wo.taskId = normalizeStr(mode.optString("taskid", ""));
+                if (wo.taskId.isEmpty()) wo.taskId = normalizeStr(mode.optString("taskId", ""));
+            }
         }
 
         wo.acceptOperator  = "";
