@@ -44,7 +44,7 @@ public class WorkerTask implements Runnable {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            // ★ 无论是否异常，都必须释放槽位，否则 MonitorTask 会永久等待 ★
+            // ★ releaseSlot 由 MonitorTask 的 AtomicInteger 计数，这里只做 Session 计数同步 ★
             s.releaseSlot();
         }
     }
