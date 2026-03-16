@@ -180,17 +180,13 @@ public class WorkOrderAdapter extends RecyclerView.Adapter<WorkOrderAdapter.VH> 
         }
         h.tvStatus.setText(wo.statusCol == null ? "" : wo.statusCol);
 
-        // 告警状态颜色
+        // 告警状态颜色 —— 只有两种：告警中 / 已恢复
         if ("告警中".equals(wo.alertStatus)) {
             h.tvAlertStatus.setText("⚡告警中");
             h.tvAlertStatus.setTextColor(Color.parseColor("#ff6b35"));
-        } else if ("已恢复".equals(wo.alertStatus)) {
+        } else {
             h.tvAlertStatus.setText("✓已恢复");
             h.tvAlertStatus.setTextColor(Color.parseColor("#40c080"));
-        } else {
-            // "未知" 或其他未明确状态 —— 灰色显示，不误导用户
-            h.tvAlertStatus.setText("?未知");
-            h.tvAlertStatus.setTextColor(Color.parseColor("#888888"));
         }
 
         // 状态列颜色
