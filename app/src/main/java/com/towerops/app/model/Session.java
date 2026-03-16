@@ -23,10 +23,9 @@ public class Session {
 
     // ---------- 登录后写入 ----------
     public volatile String userid       = "";
-    public volatile String token        = "";
+    public volatile String token        = "";   // Authorization 值，发请求时动态组头
     public volatile String mobilephone  = "";
     public volatile String username     = "";
-    public volatile String authHeader   = ""; // 对应 协议头（含 Authorization: token）
     /**
      * 真实姓名（中文），来自 AccountConfig 第三列。
      * 用于与工单 actionlist 中的 acceptOperator（中文接单人姓名）比对，
@@ -47,7 +46,6 @@ public class Session {
     private static final String KEY_TOKEN       = "token";
     private static final String KEY_MOBILE      = "mobilephone";
     private static final String KEY_USERNAME    = "username";
-    private static final String KEY_AUTH_HEADER = "auth_header";
     private static final String KEY_REALNAME    = "realname";
 
     /**
@@ -63,7 +61,7 @@ public class Session {
     }
 
     /**
-     * 登录成功后调用：把登录凭据（token/userid/authHeader 等）一起写入 SharedPreferences。
+     * 登录成功后调用：把登录凭据（token/userid 等）一起写入 SharedPreferences。
      * 服务被系统重建（START_STICKY）时进程可能重启，内存变量丢失，
      * 必须持久化才能让后台接单的 Authorization 头带上正确的 token。
      */
@@ -75,7 +73,6 @@ public class Session {
            .putString(KEY_TOKEN,       token)
            .putString(KEY_MOBILE,      mobilephone)
            .putString(KEY_USERNAME,    username)
-           .putString(KEY_AUTH_HEADER, authHeader)
            .putString(KEY_REALNAME,    realname)
            .apply();
     }
@@ -97,11 +94,10 @@ public class Session {
         String savedToken = sp.getString(KEY_TOKEN, "");
         if (!savedToken.isEmpty()) {
             token       = savedToken;
-            userid      = sp.getString(KEY_USERID,      userid);
-            mobilephone = sp.getString(KEY_MOBILE,      mobilephone);
-            username    = sp.getString(KEY_USERNAME,    username);
-            authHeader  = sp.getString(KEY_AUTH_HEADER, authHeader);
-            realname    = sp.getString(KEY_REALNAME,    realname);
+            userid      = sp.getString(KEY_USERID,   userid);
+            mobilephone = sp.getString(KEY_MOBILE,   mobilephone);
+            username    = sp.getString(KEY_USERNAME,  username);
+            realname    = sp.getString(KEY_REALNAME,  realname);
         }
     }
 
