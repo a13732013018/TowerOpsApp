@@ -113,9 +113,19 @@
         android:text="上次反馈：尚未反馈"
         android:textColor="#9090c0"
         android:textSize="11sp"
+        android:layout_marginBottom="2dp" />
+
+    <!-- 第七行：告警发生时间 -->
+    <TextView
+        android:id="@+id/tvAlertTime"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="#a06030"
+        android:textSize="11sp"
         android:layout_marginBottom="3dp" />
 
-    <!-- 第七行：当前状态 -->
+    <!-- 第八行：当前状态 -->
     <TextView
         android:id="@+id/tvStatus"
         android:layout_width="match_parent"
