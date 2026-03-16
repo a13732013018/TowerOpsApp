@@ -168,6 +168,7 @@ public class LoginActivity extends AppCompatActivity {
                             + "equiptoken: \n"
                             + "appVer: 202112\n"
                             + "Content-Type: application/x-www-form-urlencoded\n"
+                            + "Host: ywapp.chinatowercom.cn:58090\n"
                             + "User-Agent: okhttp/4.10.0\n"
                             + "Connection: Keep-Alive";
                     // ★ 持久化登录凭据：服务被系统重建(START_STICKY)后进程重启，
