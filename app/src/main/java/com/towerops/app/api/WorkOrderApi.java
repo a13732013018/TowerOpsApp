@@ -21,17 +21,25 @@ public class WorkOrderApi {
     private static final String BASE = "http://ywapp.chinatowercom.cn:58090/itower/mobile/app/service";
 
     // =====================================================================
+    // ★ 版本号 —— 每次升级只改这两行 ★
+    //   V    : URL 里的 v=x.x.xx 参数（对应铁塔APP接口版本）
+    //   UPVS : POST 里的 upvs=xxxx-xx-xx-ccssoft 参数
+    // =====================================================================
+    private static final String V    = "1.0.93";
+    private static final String UPVS = "2025-04-12-ccssoft";
+
+    // =====================================================================
     // 1. 获取工单监控列表
     // =====================================================================
     public static String getBillMonitorList() {
         Session s    = Session.get();
         String ts    = TimeUtil.getCurrentTimestamp();
-        String url   = BASE + "?porttype=GET_BILL_MONITOR_LIST&v=1.0.93&userid=" + s.userid + "&c=0";
+        String url   = BASE + "?porttype=GET_BILL_MONITOR_LIST&v=" + V + "&userid=" + s.userid + "&c=0";
         String post  = "start=1&limit=500"
                 + "&c_timestamp="  + ts
                 + "&c_account="    + s.userid
                 + "&c_sign=E9163ADC4E8E9B20293C8FC11A78E652"
-                + "&upvs=2025-03-15-ccssoft";
+                + "&upvs=" + UPVS;
         return HttpUtil.post(url, post, s.authHeader, null);
     }
 
@@ -41,14 +49,14 @@ public class WorkOrderApi {
     public static String getBillAlarmList(String billSn) {
         Session s   = Session.get();
         String ts   = TimeUtil.getCurrentTimestamp();
-        String url  = BASE + "?porttype=GET_BILL_ALARM_LIST&v=1.0.93&userid=" + s.userid + "&c=0";
+        String url  = BASE + "?porttype=GET_BILL_ALARM_LIST&v=" + V + "&userid=" + s.userid + "&c=0";
         String post = "start=1&limit=200"
                 + "&billsn="       + billSn
                 + "&history_lasttime="
                 + "&c_timestamp="  + ts
                 + "&c_account="    + s.userid
                 + "&c_sign=A7A87D3B5CB64B8DF7481E63D421F590"
-                + "&upvs=2025-03-16-ccssoft";
+                + "&upvs=" + UPVS;
         return HttpUtil.post(url, post, s.authHeader, null);
     }
 
@@ -58,14 +66,14 @@ public class WorkOrderApi {
     public static String getBillDetail(String billSn) {
         Session s   = Session.get();
         String ts   = TimeUtil.getCurrentTimestamp();
-        String url  = BASE + "?porttype=GET_BILL_DETAIL&v=1.0.93&userid=" + s.userid + "&c=0";
+        String url  = BASE + "?porttype=GET_BILL_DETAIL&v=" + V + "&userid=" + s.userid + "&c=0";
         String post = "billSn="    + billSn
                 + "&fromsource=list"
                 + "&title=%E6%95%85%E9%9A%9C%E5%B7%A5%E5%8D%95%E5%BE%85%E5%8A%9E"
                 + "&c_timestamp="  + ts
                 + "&c_account="    + s.userid
                 + "&c_sign=AF0F2A3018F6E966F3529BE87166E1B5"
-                + "&upvs=2025-04-08-ccssoft";
+                + "&upvs=" + UPVS;
         return HttpUtil.post(url, post, s.authHeader, null);
     }
 
@@ -75,7 +83,7 @@ public class WorkOrderApi {
     public static String addRemark(String taskId, String comment, String billSn) {
         Session s   = Session.get();
         String ts   = TimeUtil.getCurrentTimestamp();
-        String url  = BASE + "?porttype=SET_BILL_ADDRREMARK&v=1.0.93&userid=" + s.userid + "&c=0";
+        String url  = BASE + "?porttype=SET_BILL_ADDRREMARK&v=" + V + "&userid=" + s.userid + "&c=0";
         String post = "taskId="      + taskId
                 + "&linkInfo="       + s.mobilephone
                 + "&dealComment="    + urlEncUtf8(comment)
@@ -83,7 +91,7 @@ public class WorkOrderApi {
                 + "&c_timestamp="    + ts
                 + "&c_account="      + s.userid
                 + "&c_sign=60A1374C9CFF382C4B2668808D4394F8"
-                + "&upvs=2025-03-16-ccssoft";
+                + "&upvs=" + UPVS;
         return HttpUtil.post(url, post, s.authHeader, null);
     }
 
@@ -98,7 +106,7 @@ public class WorkOrderApi {
     public static String acceptBill(String billId, String billSn, String taskId) {
         Session s   = Session.get();
         String ts   = TimeUtil.getCurrentTimestamp();
-        String url  = BASE + "?porttype=SET_BILL_ACCEPT&v=1.0.93&userid=" + s.userid + "&c=0";
+        String url  = BASE + "?porttype=SET_BILL_ACCEPT&v=" + V + "&userid=" + s.userid + "&c=0";
         String post = "userID="     + s.userid
                 + "&billId="        + billId
                 + "&billSn="        + billSn
@@ -109,7 +117,7 @@ public class WorkOrderApi {
                 + "&c_timestamp="   + ts
                 + "&c_account="     + s.userid
                 + "&c_sign=437C91584844E7AB0BECF79BDF0D2B94"
-                + "&upvs=2025-03-16-ccssoft";
+                + "&upvs=" + UPVS;
         return HttpUtil.post(url, post, s.authHeader, null);
     }
 
@@ -119,7 +127,7 @@ public class WorkOrderApi {
     public static String stationStatus(String taskId, String standCause, String billSn) {
         Session s   = Session.get();
         String ts   = TimeUtil.getCurrentTimestamp();
-        String url  = BASE + "?porttype=BILL_STATION_STATUS&v=1.0.93&userid=" + s.userid + "&c=0";
+        String url  = BASE + "?porttype=BILL_STATION_STATUS&v=" + V + "&userid=" + s.userid + "&c=0";
         String post = "taskId="      + taskId
                 + "&linkInfo="       + s.mobilephone
                 + "&standCause="     + urlEncUtf8(standCause)
@@ -128,7 +136,7 @@ public class WorkOrderApi {
                 + "&c_timestamp="    + ts
                 + "&c_account="      + s.userid
                 + "&c_sign=1D68314D00F4D60898CE30692F09A98F"
-                + "&upvs=2025-04-08-ccssoft";
+                + "&upvs=" + UPVS;
         return HttpUtil.post(url, post, s.authHeader, null);
     }
 
@@ -139,7 +147,7 @@ public class WorkOrderApi {
                                        String billId, String taskId) {
         Session s   = Session.get();
         String ts   = TimeUtil.getCurrentTimestamp();
-        String url  = BASE + "?porttype=SET_BILL_ELECTRICT_JUDGE&v=1.0.93&userid=" + s.userid + "&c=0";
+        String url  = BASE + "?porttype=SET_BILL_ELECTRICT_JUDGE&v=" + V + "&userid=" + s.userid + "&c=0";
         String post = "billSn="       + billSn
                 + "&actionType=N"
                 + "&dealComment="     + urlEncUtf8(dealComment)
@@ -148,7 +156,7 @@ public class WorkOrderApi {
                 + "&c_timestamp="     + ts
                 + "&c_account="       + s.userid
                 + "&c_sign=A01016A3423D0CB351B85138DABC60CE"
-                + "&upvs=2025-04-12-ccssoft";
+                + "&upvs=" + UPVS;
         return HttpUtil.post(url, post, s.authHeader, null);
     }
 
@@ -171,7 +179,7 @@ public class WorkOrderApi {
                 + "Connection: Keep-Alive\n"
                 + "User-Agent: okhttp/4.10.0";
 
-        String url  = BASE + "?porttype=BILL_GENELEC_REVERT&v=1.0.93&userid=" + s.userid + "&c=0";
+        String url  = BASE + "?porttype=BILL_GENELEC_REVERT&v=" + V + "&userid=" + s.userid + "&c=0";
         String post = "isUpStation=N"
                 + "&isRelief=N"
                 + "&faultType="     + urlEncUtf8(faultType)
@@ -185,7 +193,7 @@ public class WorkOrderApi {
                 + "&c_timestamp="   + ts
                 + "&c_account="     + s.userid
                 + "&c_sign=B5F0DE138D62276611216180553FD0D5"
-                + "&upvs=2025-04-08-ccssoft";
+                + "&upvs=" + UPVS;
 
         return HttpUtil.post(url, post, extraHeader, null);
     }
