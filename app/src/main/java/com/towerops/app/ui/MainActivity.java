@@ -31,6 +31,7 @@ public class MainActivity extends AppCompatActivity {
 
     // UI 控件
     private TextView        tvUserInfo, tvProgress, tvNextRun;
+    private TextView        btnSortBillTime, btnSortFeedbackTime, tvSortDesc;
     private CheckBox        cbFeedback, cbAccept, cbRevert;
     private EditText        etFbMin, etFbMax, etAccMin, etAccMax, etIntMin, etIntMax;
     private Button          btnStart, btnStop;
@@ -101,6 +102,7 @@ public class MainActivity extends AppCompatActivity {
 
         bindViews();
         setupRecycler();
+        setupSortButtons();
         updateUserInfo();
 
         btnStart.setOnClickListener(v -> startMonitor());
@@ -193,9 +195,12 @@ public class MainActivity extends AppCompatActivity {
     // ─────────────────────────────────────────────
 
     private void bindViews() {
-        tvUserInfo = findViewById(R.id.tvUserInfo);
-        tvProgress = findViewById(R.id.tvProgress);
-        tvNextRun  = findViewById(R.id.tvNextRun);
+        tvUserInfo         = findViewById(R.id.tvUserInfo);
+        tvProgress         = findViewById(R.id.tvProgress);
+        tvNextRun          = findViewById(R.id.tvNextRun);
+        btnSortBillTime    = findViewById(R.id.btnSortBillTime);
+        btnSortFeedbackTime= findViewById(R.id.btnSortFeedbackTime);
+        tvSortDesc         = findViewById(R.id.tvSortDesc);
         cbFeedback = findViewById(R.id.cbAutoFeedback);
         cbAccept   = findViewById(R.id.cbAutoAccept);
         cbRevert   = findViewById(R.id.cbAutoRevert);
@@ -214,6 +219,54 @@ public class MainActivity extends AppCompatActivity {
         rv.setLayoutManager(new LinearLayoutManager(this));
         adapter = new WorkOrderAdapter();
         rv.setAdapter(adapter);
+    }
+
+    private void setupSortButtons() {
+        // 工单历时排序（始终大→小，点击只刷新高亮）
+        btnSortBillTime.setOnClickListener(v -> {
+            adapter.setSortMode(WorkOrderAdapter.SortMode.BILL_TIME_DESC);
+            updateSortUI();
+        });
+
+        // 反馈历时排序（点击在 大→小 / 小→大 之间切换）
+        btnSortFeedbackTime.setOnClickListener(v -> {
+            WorkOrderAdapter.SortMode cur = adapter.getSortMode();
+            if (cur == WorkOrderAdapter.SortMode.FEEDBACK_TIME_DESC) {
+                adapter.setSortMode(WorkOrderAdapter.SortMode.FEEDBACK_TIME_ASC);
+            } else {
+                adapter.setSortMode(WorkOrderAdapter.SortMode.FEEDBACK_TIME_DESC);
+            }
+            updateSortUI();
+        });
+    }
+
+    /** 根据当前排序模式更新按钮高亮和说明文字 */
+    private void updateSortUI() {
+        WorkOrderAdapter.SortMode mode = adapter.getSortMode();
+        // 重置颜色
+        btnSortBillTime.setTextColor(0xffa0a0c0);
+        btnSortFeedbackTime.setTextColor(0xffa0a0c0);
+
+        switch (mode) {
+            case BILL_TIME_DESC:
+                btnSortBillTime.setText("工单历时 ↓");
+                btnSortBillTime.setTextColor(0xffffffff);
+                btnSortFeedbackTime.setText("反馈历时 ↕");
+                tvSortDesc.setText("工单历时 大→小");
+                break;
+            case FEEDBACK_TIME_DESC:
+                btnSortFeedbackTime.setText("反馈历时 ↓");
+                btnSortFeedbackTime.setTextColor(0xffffffff);
+                btnSortBillTime.setText("工单历时 ↓");
+                tvSortDesc.setText("反馈历时 大→小");
+                break;
+            case FEEDBACK_TIME_ASC:
+                btnSortFeedbackTime.setText("反馈历时 ↑");
+                btnSortFeedbackTime.setTextColor(0xffffffff);
+                btnSortBillTime.setText("工单历时 ↓");
+                tvSortDesc.setText("反馈历时 小→大");
+                break;
+        }
     }
 
     private void updateUserInfo() {
