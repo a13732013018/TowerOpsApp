@@ -39,13 +39,22 @@ public class WorkerTask implements Runnable {
     @Override
     public void run() {
         Session s = Session.get();
+        try {
+            doWork(s);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            // ★ 无论是否异常，都必须释放槽位，否则 MonitorTask 会永久等待 ★
+            s.releaseSlot();
+        }
+    }
 
-        // 解包任务参数（对应 分割文本 + 字符(1) 分隔）
+    private void doWork(Session s) {
         String pack = s.taskArray[taskIndex];
-        if (pack == null || pack.isEmpty()) { s.releaseSlot(); return; }
+        if (pack == null || pack.isEmpty()) return;
 
         String[] parts = pack.split("\u0001", -1);
-        if (parts.length < 11) { s.releaseSlot(); return; }
+        if (parts.length < 11) return;
 
         String billsn          = parts[0];
         String stationname     = parts[1];
@@ -61,7 +70,7 @@ public class WorkerTask implements Runnable {
 
         // 解包配置参数
         String[] cfg = s.appConfig.split("\u0001", -1);
-        if (cfg.length < 5) { s.releaseSlot(); return; }
+        if (cfg.length < 5) return;
 
         boolean enable反馈  = "true".equalsIgnoreCase(cfg[0]);
         boolean enable接单  = "true".equalsIgnoreCase(cfg[1]);
@@ -263,8 +272,6 @@ public class WorkerTask implements Runnable {
         if (!hasAction) {
             postUi(rowIndex, billsn, "-- 暂无需要操作 --");
         }
-
-        s.releaseSlot();
     }
 
     // ---- 辅助方法 ----
