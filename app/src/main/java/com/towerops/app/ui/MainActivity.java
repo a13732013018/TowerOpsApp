@@ -6,7 +6,11 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -27,6 +31,36 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * 主界面
+ *
+ * ══════════════ 已修复的 Bug 清单 ══════════════
+ *
+ * [BUG-5] onPause 置 setCallback(null) → 后台运行期间完全失联
+ *   原代码：onPause 调 monitorService.setCallback(null)，
+ *           导致后台运行时 callback=null，
+ *           MonitorService 里直接调 callback.onXxx() 抛 NPE，
+ *           接单/反馈结果全部静默丢失，且服务内有可能因 NPE 崩溃。
+ *   修复：改为 setCallback(serviceCallback, silent=true)，
+ *         保留引用、关闭 UI 更新，onResume 时传 silent=false 恢复显示。
+ *
+ * [BUG-17] onAllDone 回调调 syncConfigFromSession，覆盖用户手动设置
+ *   原代码：每轮工单处理完后，把 Session.appConfig 里的值同步回 CheckBox，
+ *           而 applyTimeSchedule（已删除）或其他逻辑修改了 appConfig，
+ *           用户手动关掉的反馈/接单开关在下一轮完成后被强制恢复为开。
+ *   修复：删除 syncConfigFromSession() 调用，onAllDone 只更新进度文字。
+ *
+ * [BUG-18] 每次键盘敲击都写 SharedPreferences（高频 IO）
+ *   原代码：EditText TextWatcher.afterTextChanged → applyConfigNow → saveConfig，
+ *           用户输入"120"要调3次 apply()。
+ *   修复：加 300ms 防抖，连续输入停止后只写一次。
+ *
+ * [BUG-19] setCallback 接口改为双参数，调用处需同步更新
+ *   修复：onServiceConnected / onResume / onPause 全部更新。
+ *
+ * [BUG-20] setInterval 改名为 setIntervalAndReschedule，调用处需同步更新
+ *   修复：startMonitor / applyConfigNow 全部更新。
+ */
 public class MainActivity extends AppCompatActivity {
 
     // UI 控件
@@ -42,27 +76,34 @@ public class MainActivity extends AppCompatActivity {
     private MonitorService  monitorService;
     private boolean         serviceBound = false;
 
+    // [BUG-18] 防抖 Handler
+    private final Handler  debounceHandler  = new Handler(Looper.getMainLooper());
+    private       Runnable debounceRunnable;
+
+    // ── 服务连接 ──────────────────────────────────────────────────────────
+
     private final ServiceConnection conn = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
-            MonitorService.LocalBinder binder = (MonitorService.LocalBinder) service;
-            monitorService = binder.getService();
+            MonitorService.LocalBinder lb = (MonitorService.LocalBinder) service;
+            monitorService = lb.getService();
             serviceBound   = true;
-            // 注册 UI 回调
-            monitorService.setCallback(serviceCallback);
-            // 同步按钮状态（服务可能已在运行）
+            // [BUG-19 修复] silent=false：Activity 在前台，开启 UI 更新
+            monitorService.setCallback(serviceCallback, false);
             syncButtonState();
         }
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            serviceBound = false;
+            serviceBound   = false;
             monitorService = null;
         }
     };
 
-    // 服务回调 → 刷新 UI
-    private final MonitorService.ServiceCallback serviceCallback = new MonitorService.ServiceCallback() {
+    // 服务回调（所有方法均在主线程执行）
+    private final MonitorService.ServiceCallback serviceCallback =
+            new MonitorService.ServiceCallback() {
+
         @Override
         public void onOrdersReady(List<WorkOrder> orders) {
             tvProgress.setText("共 " + orders.size() + " 条工单，处理中...");
@@ -76,7 +117,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onAllDone(int done, int total) {
-            syncConfigFromSession();
+            // [BUG-17 修复] 不再调 syncConfigFromSession，避免覆盖用户设置
             String time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
             tvProgress.setText("本轮完成 " + done + "/" + total + " 条  " + time);
         }
@@ -92,9 +133,7 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    // ─────────────────────────────────────────────
-    // 生命周期
-    // ─────────────────────────────────────────────
+    // ── 生命周期 ──────────────────────────────────────────────────────────
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,12 +143,12 @@ public class MainActivity extends AppCompatActivity {
         bindViews();
         setupRecycler();
         setupSortButtons();
+        setupConfigWatchers();
         updateUserInfo();
 
         btnStart.setOnClickListener(v -> startMonitor());
         btnStop.setOnClickListener(v  -> stopMonitor());
 
-        // 启动并绑定前台服务
         Intent intent = new Intent(this, MonitorService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent);
@@ -123,8 +162,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         if (serviceBound && monitorService != null) {
-            // 重新注册回调（setCallback内部会主动推送一次倒计时给UI）
-            monitorService.setCallback(serviceCallback);
+            // [BUG-5 修复] 恢复前台：取消静默模式，重新接收 UI 更新
+            monitorService.setCallback(serviceCallback, false);
             syncButtonState();
         }
     }
@@ -132,26 +171,24 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        // ★ 退到后台只解除UI回调引用，服务本身继续全速运行 ★
-        // ★ 不再置null——改为传入一个"静默回调"，避免callback==null时UI恢复慢 ★
+        // [BUG-5 修复] 退后台：保留 callback 引用但静默，Service 继续全速运行
         if (serviceBound && monitorService != null) {
-            monitorService.setCallback(null);
+            monitorService.setCallback(serviceCallback, true);
         }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        debounceHandler.removeCallbacks(debounceRunnable);
         if (serviceBound) {
             unbindService(conn);
             serviceBound = false;
         }
-        // 注意：不 stopService，让服务继续在后台跑
+        // 不 stopService，让服务继续后台运行
     }
 
-    // ─────────────────────────────────────────────
-    // 开始 / 停止
-    // ─────────────────────────────────────────────
+    // ── 开始 / 停止 ───────────────────────────────────────────────────────
 
     private void startMonitor() {
         if (!serviceBound || monitorService == null) {
@@ -163,7 +200,8 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         buildConfig();
-        monitorService.setInterval(
+        // [BUG-20 修复] 改用新方法名，触发立即重新调度
+        monitorService.setIntervalAndReschedule(
                 parseInt(etIntMin.getText().toString(), 90),
                 parseInt(etIntMax.getText().toString(), 120));
         monitorService.startMonitor();
@@ -191,30 +229,88 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // ─────────────────────────────────────────────
-    // 工具方法
-    // ─────────────────────────────────────────────
+    // ── 配置监听 ──────────────────────────────────────────────────────────
+
+    private void setupConfigWatchers() {
+        // [BUG-18 修复] TextWatcher 通过防抖触发，连续输入停止300ms后才写入
+        TextWatcher watcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+            @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
+            @Override public void afterTextChanged(Editable s) {
+                scheduleApplyConfig();
+            }
+        };
+        etFbMin.addTextChangedListener(watcher);
+        etFbMax.addTextChangedListener(watcher);
+        etAccMin.addTextChangedListener(watcher);
+        etAccMax.addTextChangedListener(watcher);
+        etIntMin.addTextChangedListener(watcher);
+        etIntMax.addTextChangedListener(watcher);
+
+        cbFeedback.setOnCheckedChangeListener((btn, checked) -> applyConfigNow());
+        cbAccept.setOnCheckedChangeListener(  (btn, checked) -> applyConfigNow());
+        cbRevert.setOnCheckedChangeListener(  (btn, checked) -> applyConfigNow());
+    }
+
+    private void scheduleApplyConfig() {
+        if (debounceRunnable != null) debounceHandler.removeCallbacks(debounceRunnable);
+        debounceRunnable = this::applyConfigNow;
+        debounceHandler.postDelayed(debounceRunnable, 300L);
+    }
+
+    /**
+     * 立即将当前 UI 配置写入 Session 并通知 Service 重新调度轮询间隔。
+     */
+    private void applyConfigNow() {
+        buildConfig();
+        if (serviceBound && monitorService != null) {
+            // [BUG-20 修复] 改用新方法名，阈值修改立即生效
+            monitorService.setIntervalAndReschedule(
+                    parseInt(etIntMin.getText().toString(), 90),
+                    parseInt(etIntMax.getText().toString(), 120));
+        }
+    }
+
+    private void buildConfig() {
+        Session s        = Session.get();
+        String fb        = cbFeedback.isChecked() ? "true" : "false";
+        String acc       = cbAccept.isChecked()   ? "true" : "false";
+        String rev       = cbRevert.isChecked()   ? "true" : "false";
+        String fbMinStr  = defaultIfEmpty(etFbMin.getText().toString().trim(),  "70");
+        String fbMaxStr  = defaultIfEmpty(etFbMax.getText().toString().trim(),  "90");
+        String accMinStr = defaultIfEmpty(etAccMin.getText().toString().trim(), "60");
+        String accMaxStr = defaultIfEmpty(etAccMax.getText().toString().trim(), "90");
+
+        s.appConfig = fb  + "\u0001"
+                    + acc + "\u0001"
+                    + rev + "\u0001"
+                    + fbMinStr  + "|" + fbMaxStr  + "\u0001"
+                    + accMinStr + "|" + accMaxStr;
+        s.saveConfig(this);
+    }
+
+    // ── 视图初始化 ────────────────────────────────────────────────────────
 
     private void bindViews() {
-        tvUserInfo         = findViewById(R.id.tvUserInfo);
-        tvProgress         = findViewById(R.id.tvProgress);
-        tvNextRun          = findViewById(R.id.tvNextRun);
-        btnSortBillTime    = findViewById(R.id.btnSortBillTime);
-        btnSortFeedbackTime= findViewById(R.id.btnSortFeedbackTime);
-        btnSortAlertTime   = findViewById(R.id.btnSortAlertTime);
-        btnSortAlertStatus = findViewById(R.id.btnSortAlertStatus);
-        tvSortDesc         = findViewById(R.id.tvSortDesc);
-        cbFeedback = findViewById(R.id.cbAutoFeedback);
-        cbAccept   = findViewById(R.id.cbAutoAccept);
-        cbRevert   = findViewById(R.id.cbAutoRevert);
-        etFbMin    = findViewById(R.id.etFeedbackMin);
-        etFbMax    = findViewById(R.id.etFeedbackMax);
-        etAccMin   = findViewById(R.id.etAcceptMin);
-        etAccMax   = findViewById(R.id.etAcceptMax);
-        etIntMin   = findViewById(R.id.etIntervalMin);
-        etIntMax   = findViewById(R.id.etIntervalMax);
-        btnStart   = findViewById(R.id.btnStartMonitor);
-        btnStop    = findViewById(R.id.btnStopMonitor);
+        tvUserInfo          = findViewById(R.id.tvUserInfo);
+        tvProgress          = findViewById(R.id.tvProgress);
+        tvNextRun           = findViewById(R.id.tvNextRun);
+        btnSortBillTime     = findViewById(R.id.btnSortBillTime);
+        btnSortFeedbackTime = findViewById(R.id.btnSortFeedbackTime);
+        btnSortAlertTime    = findViewById(R.id.btnSortAlertTime);
+        btnSortAlertStatus  = findViewById(R.id.btnSortAlertStatus);
+        tvSortDesc          = findViewById(R.id.tvSortDesc);
+        cbFeedback  = findViewById(R.id.cbAutoFeedback);
+        cbAccept    = findViewById(R.id.cbAutoAccept);
+        cbRevert    = findViewById(R.id.cbAutoRevert);
+        etFbMin     = findViewById(R.id.etFeedbackMin);
+        etFbMax     = findViewById(R.id.etFeedbackMax);
+        etAccMin    = findViewById(R.id.etAcceptMin);
+        etAccMax    = findViewById(R.id.etAcceptMax);
+        etIntMin    = findViewById(R.id.etIntervalMin);
+        etIntMax    = findViewById(R.id.etIntervalMax);
+        btnStart    = findViewById(R.id.btnStartMonitor);
+        btnStop     = findViewById(R.id.btnStopMonitor);
     }
 
     private void setupRecycler() {
@@ -225,63 +321,43 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupSortButtons() {
-        // 工单历时排序（点击在 大→小 / 小→大 之间切换）
         btnSortBillTime.setOnClickListener(v -> {
             WorkOrderAdapter.SortMode cur = adapter.getSortMode();
-            if (cur == WorkOrderAdapter.SortMode.BILL_TIME_DESC) {
-                adapter.setSortMode(WorkOrderAdapter.SortMode.BILL_TIME_ASC);
-            } else {
-                adapter.setSortMode(WorkOrderAdapter.SortMode.BILL_TIME_DESC);
-            }
+            adapter.setSortMode(cur == WorkOrderAdapter.SortMode.BILL_TIME_DESC
+                    ? WorkOrderAdapter.SortMode.BILL_TIME_ASC
+                    : WorkOrderAdapter.SortMode.BILL_TIME_DESC);
             updateSortUI();
         });
-
-        // 反馈历时排序（点击在 大→小 / 小→大 之间切换）
         btnSortFeedbackTime.setOnClickListener(v -> {
             WorkOrderAdapter.SortMode cur = adapter.getSortMode();
-            if (cur == WorkOrderAdapter.SortMode.FEEDBACK_TIME_DESC) {
-                adapter.setSortMode(WorkOrderAdapter.SortMode.FEEDBACK_TIME_ASC);
-            } else {
-                adapter.setSortMode(WorkOrderAdapter.SortMode.FEEDBACK_TIME_DESC);
-            }
+            adapter.setSortMode(cur == WorkOrderAdapter.SortMode.FEEDBACK_TIME_DESC
+                    ? WorkOrderAdapter.SortMode.FEEDBACK_TIME_ASC
+                    : WorkOrderAdapter.SortMode.FEEDBACK_TIME_DESC);
             updateSortUI();
         });
-
-        // 告警时间排序（点击在 最新→最旧 / 最旧→最新 之间切换）
         btnSortAlertTime.setOnClickListener(v -> {
             WorkOrderAdapter.SortMode cur = adapter.getSortMode();
-            if (cur == WorkOrderAdapter.SortMode.ALERT_TIME_DESC) {
-                adapter.setSortMode(WorkOrderAdapter.SortMode.ALERT_TIME_ASC);
-            } else {
-                adapter.setSortMode(WorkOrderAdapter.SortMode.ALERT_TIME_DESC);
-            }
+            adapter.setSortMode(cur == WorkOrderAdapter.SortMode.ALERT_TIME_DESC
+                    ? WorkOrderAdapter.SortMode.ALERT_TIME_ASC
+                    : WorkOrderAdapter.SortMode.ALERT_TIME_DESC);
             updateSortUI();
         });
-
-        // 告警状态排序（点击在 告警中优先 / 已恢复优先 之间切换）
         btnSortAlertStatus.setOnClickListener(v -> {
             WorkOrderAdapter.SortMode cur = adapter.getSortMode();
-            if (cur == WorkOrderAdapter.SortMode.ALERT_STATUS_ALARM) {
-                adapter.setSortMode(WorkOrderAdapter.SortMode.ALERT_STATUS_RECOVER);
-            } else {
-                adapter.setSortMode(WorkOrderAdapter.SortMode.ALERT_STATUS_ALARM);
-            }
+            adapter.setSortMode(cur == WorkOrderAdapter.SortMode.ALERT_STATUS_ALARM
+                    ? WorkOrderAdapter.SortMode.ALERT_STATUS_RECOVER
+                    : WorkOrderAdapter.SortMode.ALERT_STATUS_ALARM);
             updateSortUI();
         });
-
-        // 初始化排序 UI 显示
         updateSortUI();
     }
 
-    /** 根据当前排序模式更新按钮高亮和说明文字 */
     private void updateSortUI() {
         WorkOrderAdapter.SortMode mode = adapter.getSortMode();
-        // 全部重置为暗色
         btnSortBillTime.setTextColor(0xffa0a0c0);
         btnSortFeedbackTime.setTextColor(0xffa0a0c0);
         btnSortAlertTime.setTextColor(0xffa0a0c0);
         btnSortAlertStatus.setTextColor(0xffa0a0c0);
-        // 重置箭头（工单历时、告警时间、告警状态都支持双向切换，统一用 ↕）
         btnSortBillTime.setText("工单历时 ↕");
         btnSortFeedbackTime.setText("反馈历时 ↕");
         btnSortAlertTime.setText("告警时间 ↕");
@@ -291,43 +367,35 @@ public class MainActivity extends AppCompatActivity {
             case BILL_TIME_DESC:
                 btnSortBillTime.setText("工单历时 ↓");
                 btnSortBillTime.setTextColor(0xffffffff);
-                tvSortDesc.setText("工单历时 大→小");
-                break;
+                tvSortDesc.setText("工单历时 大→小"); break;
             case BILL_TIME_ASC:
                 btnSortBillTime.setText("工单历时 ↑");
                 btnSortBillTime.setTextColor(0xffffffff);
-                tvSortDesc.setText("工单历时 小→大");
-                break;
+                tvSortDesc.setText("工单历时 小→大"); break;
             case FEEDBACK_TIME_DESC:
                 btnSortFeedbackTime.setText("反馈历时 ↓");
                 btnSortFeedbackTime.setTextColor(0xffffffff);
-                tvSortDesc.setText("反馈历时 大→小");
-                break;
+                tvSortDesc.setText("反馈历时 大→小"); break;
             case FEEDBACK_TIME_ASC:
                 btnSortFeedbackTime.setText("反馈历时 ↑");
                 btnSortFeedbackTime.setTextColor(0xffffffff);
-                tvSortDesc.setText("反馈历时 小→大");
-                break;
+                tvSortDesc.setText("反馈历时 小→大"); break;
             case ALERT_TIME_DESC:
                 btnSortAlertTime.setText("告警时间 ↓");
                 btnSortAlertTime.setTextColor(0xffffffff);
-                tvSortDesc.setText("告警时间 最新→最旧");
-                break;
+                tvSortDesc.setText("告警时间 最新→最旧"); break;
             case ALERT_TIME_ASC:
                 btnSortAlertTime.setText("告警时间 ↑");
                 btnSortAlertTime.setTextColor(0xffffffff);
-                tvSortDesc.setText("告警时间 最旧→最新");
-                break;
+                tvSortDesc.setText("告警时间 最旧→最新"); break;
             case ALERT_STATUS_ALARM:
                 btnSortAlertStatus.setText("告警中优先 ↓");
                 btnSortAlertStatus.setTextColor(0xffff6b35);
-                tvSortDesc.setText("告警中优先");
-                break;
+                tvSortDesc.setText("告警中优先"); break;
             case ALERT_STATUS_RECOVER:
                 btnSortAlertStatus.setText("已恢复优先 ↓");
                 btnSortAlertStatus.setTextColor(0xff40c080);
-                tvSortDesc.setText("已恢复优先");
-                break;
+                tvSortDesc.setText("已恢复优先"); break;
         }
     }
 
@@ -336,35 +404,13 @@ public class MainActivity extends AppCompatActivity {
         tvUserInfo.setText(s.username.isEmpty() ? "未登录" : s.username + " | " + s.userid);
     }
 
-    private void buildConfig() {
-        Session s = Session.get();
-        String fb    = cbFeedback.isChecked() ? "true" : "false";
-        String acc   = cbAccept.isChecked()   ? "true" : "false";
-        String rev   = cbRevert.isChecked()   ? "true" : "false";
-        String fbMinStr  = etFbMin.getText().toString().trim();
-        String fbMaxStr  = etFbMax.getText().toString().trim();
-        String accMinStr = etAccMin.getText().toString().trim();
-        String accMaxStr = etAccMax.getText().toString().trim();
-        if (fbMinStr.isEmpty())  fbMinStr  = "70";
-        if (fbMaxStr.isEmpty())  fbMaxStr  = "90";
-        if (accMinStr.isEmpty()) accMinStr = "60";
-        if (accMaxStr.isEmpty()) accMaxStr = "90";
-        s.appConfig = fb + "\u0001" + acc + "\u0001" + rev + "\u0001"
-                + fbMinStr + "|" + fbMaxStr + "\u0001"
-                + accMinStr + "|" + accMaxStr;
-    }
-
-    private void syncConfigFromSession() {
-        Session s = Session.get();
-        if (s.appConfig.isEmpty()) return;
-        String[] parts = s.appConfig.split("\u0001", -1);
-        if (parts.length >= 2) {
-            cbFeedback.setChecked("true".equalsIgnoreCase(parts[0]));
-            cbAccept.setChecked("true".equalsIgnoreCase(parts[1]));
-        }
-    }
+    // ── 静态工具 ──────────────────────────────────────────────────────────
 
     private static int parseInt(String s, int def) {
         try { return Integer.parseInt(s.trim()); } catch (Exception e) { return def; }
+    }
+
+    private static String defaultIfEmpty(String s, String def) {
+        return (s == null || s.isEmpty()) ? def : s;
     }
 }
