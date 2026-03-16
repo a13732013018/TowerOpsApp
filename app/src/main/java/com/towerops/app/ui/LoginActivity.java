@@ -170,6 +170,10 @@ public class LoginActivity extends AppCompatActivity {
                             + "Content-Type: application/x-www-form-urlencoded\n"
                             + "User-Agent: okhttp/4.10.0\n"
                             + "Connection: Keep-Alive";
+                    // ★ 持久化登录凭据：服务被系统重建(START_STICKY)后进程重启，
+                    //   内存变量清空，必须从 SharedPreferences 恢复 token，
+                    //   否则后台接单时 Authorization 头为空，服务器鉴权失败 ★
+                    s.saveLogin(this);
 
                     Toast.makeText(this, "登录成功！" + r.username, Toast.LENGTH_SHORT).show();
                     startActivity(new Intent(this, MainActivity.class));
