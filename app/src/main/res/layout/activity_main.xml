@@ -225,26 +225,32 @@
             <Button
                 android:id="@+id/btnStartMonitor"
                 android:layout_width="wrap_content"
-                android:layout_height="30dp"
+                android:layout_height="26dp"
                 android:text="开始监控"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:background="@drawable/bg_btn_primary"
                 android:textColor="#ffffff"
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:paddingTop="0dp"
+                android:paddingBottom="0dp"
                 android:layout_marginStart="6dp"
-                android:layout_marginEnd="4dp"/>
+                android:layout_marginEnd="4dp"
+                android:layout_marginTop="-2dp"/>
 
             <Button
                 android:id="@+id/btnStopMonitor"
                 android:layout_width="wrap_content"
-                android:layout_height="30dp"
+                android:layout_height="26dp"
                 android:text="停止"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:background="@drawable/bg_btn_secondary"
                 android:textColor="#ffffff"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"/>
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:paddingTop="0dp"
+                android:paddingBottom="0dp"
+                android:layout_marginTop="-2dp"/>
         </LinearLayout>
 
     </LinearLayout>
