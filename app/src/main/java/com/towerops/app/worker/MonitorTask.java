@@ -206,7 +206,7 @@ public class MonitorTask implements Runnable {
             }
         }
 
-        // 告警状态：优先从列表字段直接读取，减少"未知"比例
+        // 告警状态：优先从列表字段直接读取
         // 服务器可能返回的字段名：alarm_status / alarmStatus / alertStatus / alarm_flag
         String rawAlarmStatus = firstNonEmpty(
                 item.optString("alarm_status",  ""),
@@ -214,24 +214,19 @@ public class MonitorTask implements Runnable {
                 item.optString("alertStatus",   ""),
                 item.optString("alarm_flag",    "")
         );
-        // 字段值映射：1/Y/yes/true/告警中 → "告警中"；0/N/no/false/已恢复 → "已恢复"；其余 → "未知"
-        if (!rawAlarmStatus.isEmpty()) {
-            if ("1".equals(rawAlarmStatus) || "Y".equalsIgnoreCase(rawAlarmStatus)
-                    || "yes".equalsIgnoreCase(rawAlarmStatus)
-                    || "true".equalsIgnoreCase(rawAlarmStatus)
-                    || rawAlarmStatus.contains("告警") || rawAlarmStatus.contains("alarm")) {
-                wo.alertStatus = "告警中";
-            } else if ("0".equals(rawAlarmStatus) || "N".equalsIgnoreCase(rawAlarmStatus)
-                    || "no".equalsIgnoreCase(rawAlarmStatus)
-                    || "false".equalsIgnoreCase(rawAlarmStatus)
-                    || rawAlarmStatus.contains("恢复") || rawAlarmStatus.contains("normal")) {
-                wo.alertStatus = "已恢复";
-            } else {
-                wo.alertStatus = "未知";
-            }
+        // 字段值映射：1/Y/yes/true/告警中 → "告警中"；其余（含空/未找到）→ "已恢复"
+        if (!rawAlarmStatus.isEmpty()
+                && ("1".equals(rawAlarmStatus)
+                || "Y".equalsIgnoreCase(rawAlarmStatus)
+                || "yes".equalsIgnoreCase(rawAlarmStatus)
+                || "true".equalsIgnoreCase(rawAlarmStatus)
+                || rawAlarmStatus.contains("告警")
+                || rawAlarmStatus.contains("alarm"))) {
+            wo.alertStatus = "告警中";
         } else {
-            // 列表 JSON 中没有告警状态字段，WorkerTask 回单时按需查询
-            wo.alertStatus = "未知";
+            // 未找到字段或值为 0/N/false/已恢复 → 默认已恢复
+            // WorkerTask 回单场景会再补查一次确认
+            wo.alertStatus = "已恢复";
         }
 
         // 告警时间
