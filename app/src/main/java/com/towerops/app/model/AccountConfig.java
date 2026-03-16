@@ -12,7 +12,7 @@ public class AccountConfig {
             {"wx-maoll5",        "z0J1CVrRPjfQgO4jhLuJwg%3D%3D"},
             {"wx-jinlz",         "z0J1CVrRPjfQgO4jhLuJwg%3D%3D"},
             {"wx-wangjj96",      "uwhpKacQXX1aC3eyE9rkQg%3D%3D"},
-            {"%20%20wx-liusl35", "0b1XBanT0rLwBl%2BMIo87Lw%3D%3D"},
+            {"wx-liusl35",       "WFr6AEK5IurXc7KifVhtYQ%3D%3D"},
             {"wx-wangsw9",       "z0J1CVrRPjfQgO4jhLuJwg%3D%3D"},
     };
 
