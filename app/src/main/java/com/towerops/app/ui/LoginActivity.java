@@ -161,19 +161,12 @@ public class LoginActivity extends AppCompatActivity {
                 if (r.success) {
                     Session s     = Session.get();
                     s.userid      = r.userid;
-                    s.token       = r.token;
+                    s.token       = r.token;       // 协议头由 WorkOrderApi 统一用 token 构建
                     s.mobilephone = r.mobilephone;
                     s.username    = r.username;
                     // [BUG-FIX] realname = 账号对应的中文真实姓名（AccountConfig 第三列）
                     // 用于后台接单/回单时匹配工单里的 acceptOperator（中文姓名）
                     s.realname    = AccountConfig.getRealname(idx);
-                    s.authHeader  = "Authorization: " + r.token + "\n"
-                            + "equiptoken: \n"
-                            + "appVer: 202112\n"
-                            + "Content-Type: application/x-www-form-urlencoded\n"
-                            + "Host: ywapp.chinatowercom.cn:58090\n"
-                            + "User-Agent: okhttp/4.10.0\n"
-                            + "Connection: Keep-Alive";
                     // ★ 持久化登录凭据：服务被系统重建(START_STICKY)后进程重启，
                     //   内存变量清空，必须从 SharedPreferences 恢复 token，
                     //   否则后台接单时 Authorization 头为空，服务器鉴权失败 ★
