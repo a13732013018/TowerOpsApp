@@ -54,19 +54,20 @@ public class WorkerTask implements Runnable {
         if (pack == null || pack.isEmpty()) return;
 
         String[] parts = pack.split("\u0001", -1);
-        if (parts.length < 11) return;
+        if (parts.length < 12) return;
 
         String billsn          = parts[0];
         String stationname     = parts[1];
         String billtitle       = parts[2];
         String billid          = parts[3];
         String taskId          = parts[4];
-        String acceptOperator  = parts[5];
+        String acceptOperator  = parts[5].trim(); // trim() 防止空格导致误判"已接单"
         String dealInfo        = parts[6];
         String alertStatus     = parts[7];
         int    timeDiff1       = parseInt(parts[8]);
         int    timeDiff2       = parseInt(parts[9]);
-        int    rowIndex        = parseInt(parts[10]);
+        // parts[10] = alertTime（暂不用于处理逻辑）
+        int    rowIndex        = parseInt(parts[11]);
 
         // 解包配置参数
         String[] cfg = s.appConfig.split("\u0001", -1);
@@ -122,11 +123,16 @@ public class WorkerTask implements Runnable {
         }
 
         // ==================== 场景二：自动接单 ====================
-        // 条件：未接单（acceptOperator为空）+ billId非空 + 距创建时间 >= 阈值分钟
-        // 注意：接单只需要 billId + billSn，taskId 为空也可接单，不做 taskId 判断
+        // 条件：未接单（acceptOperator为空/null）+ billId非空 + 距创建时间 >= 阈值分钟
+        // 注意：接单只需要 billId + billSn，taskId 为空也可接单
+        // 修复：服务器有时返回"null"字符串，需过滤掉
+        boolean notAccepted = acceptOperator.isEmpty()
+                || "null".equalsIgnoreCase(acceptOperator)
+                || "-".equals(acceptOperator);
         if (enable接单
-                && acceptOperator.isEmpty()
+                && notAccepted
                 && !billid.isEmpty()
+                && !"null".equalsIgnoreCase(billid)
                 && timeDiff2 >= 阈值接单) {
 
             hasAction = true;
