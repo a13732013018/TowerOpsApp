@@ -176,8 +176,9 @@ public class MonitorTask implements Runnable {
             pool.execute(new WorkerTask(idx, uiCb));
         }
 
-        // ---- 6. 等待全部完成 ----
-        while (!s.allDone()) {
+        // ---- 6. 等待全部完成（最长等 8 分钟，防止 WorkerTask 异常后永久阻塞）----
+        long deadline = System.currentTimeMillis() + 8 * 60 * 1000L;
+        while (!s.allDone() && System.currentTimeMillis() < deadline) {
             try { Thread.sleep(200); } catch (InterruptedException ignored) {}
         }
         pool.shutdown();
