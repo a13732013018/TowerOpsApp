@@ -27,6 +27,14 @@ public class Session {
     public volatile String mobilephone  = "";
     public volatile String username     = "";
     public volatile String authHeader   = ""; // 对应 协议头（含 Authorization: token）
+    /**
+     * 真实姓名（中文），来自 AccountConfig 第三列。
+     * 用于与工单 actionlist 中的 acceptOperator（中文接单人姓名）比对，
+     * 以决定是否触发自动接单/回单。
+     *
+     * [BUG-FIX] 原代码用 username（账号工号）比对中文姓名，永远不等，后台接单/回单无法触发。
+     */
+    public volatile String realname     = "";
 
     // ---------- 运行时配置（主线程写，工作线程读）----------
     // ★ appConfig 同时保存在内存和 SharedPreferences，服务重建后可从 prefs 恢复 ★
@@ -40,6 +48,7 @@ public class Session {
     private static final String KEY_MOBILE      = "mobilephone";
     private static final String KEY_USERNAME    = "username";
     private static final String KEY_AUTH_HEADER = "auth_header";
+    private static final String KEY_REALNAME    = "realname";
 
     /**
      * 将 appConfig 持久化到 SharedPreferences。
@@ -67,6 +76,7 @@ public class Session {
            .putString(KEY_MOBILE,      mobilephone)
            .putString(KEY_USERNAME,    username)
            .putString(KEY_AUTH_HEADER, authHeader)
+           .putString(KEY_REALNAME,    realname)
            .apply();
     }
 
@@ -91,6 +101,7 @@ public class Session {
             mobilephone = sp.getString(KEY_MOBILE,      mobilephone);
             username    = sp.getString(KEY_USERNAME,    username);
             authHeader  = sp.getString(KEY_AUTH_HEADER, authHeader);
+            realname    = sp.getString(KEY_REALNAME,    realname);
         }
     }
 
