@@ -206,10 +206,41 @@ public class MonitorTask implements Runnable {
             }
         }
 
-        // [BUG-7 修复] 告警状态不在这里串行请求，默认填"未知"，
-        //   WorkerTask 回单场景里按需并发获取，大幅减少解析阶段耗时
-        wo.alertStatus = "未知";
-        wo.alertTime   = "";
+        // 告警状态：优先从列表字段直接读取，减少"未知"比例
+        // 服务器可能返回的字段名：alarm_status / alarmStatus / alertStatus / alarm_flag
+        String rawAlarmStatus = firstNonEmpty(
+                item.optString("alarm_status",  ""),
+                item.optString("alarmStatus",   ""),
+                item.optString("alertStatus",   ""),
+                item.optString("alarm_flag",    "")
+        );
+        // 字段值映射：1/Y/yes/true/告警中 → "告警中"；0/N/no/false/已恢复 → "已恢复"；其余 → "未知"
+        if (!rawAlarmStatus.isEmpty()) {
+            if ("1".equals(rawAlarmStatus) || "Y".equalsIgnoreCase(rawAlarmStatus)
+                    || "yes".equalsIgnoreCase(rawAlarmStatus)
+                    || "true".equalsIgnoreCase(rawAlarmStatus)
+                    || rawAlarmStatus.contains("告警") || rawAlarmStatus.contains("alarm")) {
+                wo.alertStatus = "告警中";
+            } else if ("0".equals(rawAlarmStatus) || "N".equalsIgnoreCase(rawAlarmStatus)
+                    || "no".equalsIgnoreCase(rawAlarmStatus)
+                    || "false".equalsIgnoreCase(rawAlarmStatus)
+                    || rawAlarmStatus.contains("恢复") || rawAlarmStatus.contains("normal")) {
+                wo.alertStatus = "已恢复";
+            } else {
+                wo.alertStatus = "未知";
+            }
+        } else {
+            // 列表 JSON 中没有告警状态字段，WorkerTask 回单时按需查询
+            wo.alertStatus = "未知";
+        }
+
+        // 告警时间
+        wo.alertTime = firstNonEmpty(
+                item.optString("alarm_time",   ""),
+                item.optString("alarmTime",    ""),
+                item.optString("alert_time",   ""),
+                item.optString("alertTime",    "")
+        );
 
         // timeDiff 计算
         wo.timeDiff2 = Math.max(0, WorkOrderApi.minutesDiff(wo.createTime));
