@@ -162,7 +162,10 @@ public class WorkerTask implements Runnable {
             postUi(rowIndex, billsn, "准备接单[" + timeDiff2 + "≥" + 阈值接单 + "min]...");
             lock.lock();
             try {
-                postUi(rowIndex, billsn, "点击接单(billId=" + billid + " taskId=" + taskId + ")...");
+                postUi(rowIndex, billsn, "点击接单(billId=" + billid
+                        + " taskId=" + taskId
+                        + " userid=" + s.userid
+                        + " realname=" + s.realname + ")...");
                 sleepMs(randInt(1000, 2000));
 
                 String  acceptResult = "";
@@ -235,8 +238,12 @@ public class WorkerTask implements Runnable {
 
         // ════════════════════════════════════════════════════════════
         // 场景三：自动回单
+        // [BUG-FIX] 原来用 s.username（账号工号，如 wx-linjy22）和
+        //           acceptOperator（中文姓名，如"林俊宇"）比对，
+        //           两种格式永远不等 → 回单永远不触发。
+        //   修复：改用 s.realname（从 AccountConfig 读取的中文真实姓名）比对。
         // ════════════════════════════════════════════════════════════
-        if (enable回单 && acceptOperator.equals(s.username)) {
+        if (enable回单 && !s.realname.isEmpty() && s.realname.equals(acceptOperator)) {
 
             // 状态不明确时补查一次
             if (!"已恢复".equals(alertStatus) && !"告警中".equals(alertStatus)) {
