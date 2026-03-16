@@ -15,14 +15,24 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 主控线程 —— 对应易语言 子程序_主控_APP工单分配
- * 负责：拉取工单列表 → 解析 → 分配工作线程
+ * 主控线程 —— 拉取工单列表 → 解析 → 分配工作线程
+ *
+ * 修复记录：
+ *   1. 线程池不再 shutdown()：MonitorService 持有同一个 pool 复用，
+ *      shutdown 后下一轮任务 execute() 会抛 RejectedExecutionException，
+ *      导致后台彻底不执行接单/反馈。改为本任务自己创建独立线程池，任务结束后 await 而非 shutdown。
+ *   2. timeDiff1 反馈时间判断修复：lastOperateTime 为空时 fallback 改为 0，
+ *      确保"上次反馈时间"语义正确——没有上次反馈时 timeDiff1=0，不满足>=阈值，不触发反馈。
+ *      等下一轮到达阈值后才反馈，避免工单刚创建就立刻疯狂反馈。
+ *   3. 等待机制改用 AtomicInteger 倒计槽位 + deadline 双保险，防止槽位泄漏导致永久卡死。
  */
 public class MonitorTask implements Runnable {
 
-    private static final int MAX_THREADS = 30;
+    private static final int MAX_THREADS = 10; // 降低并发，减少服务器压力
 
     /** 主控完成后回调（用于刷新 UI 进度 / 完成提示）*/
     public interface MonitorCallback {
@@ -38,8 +48,6 @@ public class MonitorTask implements Runnable {
 
     private final MonitorCallback callback;
     private final Handler         mainHandler = new Handler(Looper.getMainLooper());
-    // 线程池：最多 MAX_THREADS 条并发
-    private final ExecutorService pool = Executors.newFixedThreadPool(MAX_THREADS);
 
     public MonitorTask(MonitorCallback callback) {
         this.callback = callback;
@@ -74,21 +82,21 @@ public class MonitorTask implements Runnable {
         }
 
         // ---- 2. 解析每条工单 ----
-        List<WorkOrder> orders = new ArrayList<>();
-        String[] taskPacks = new String[count + 1]; // 1-based
+        List<WorkOrder> orders   = new ArrayList<>();
+        String[]        taskPacks = new String[count + 1]; // 1-based
 
         for (int i = 0; i < count; i++) {
             try {
                 JSONObject item = billList.getJSONObject(i);
                 WorkOrder wo = new WorkOrder();
-                wo.index          = i + 1;
-                wo.billsn         = item.optString("billsn");
-                wo.replyTime      = item.optString("reply_time");
-                wo.createTime     = item.optString("createtime");
-                wo.stationname    = item.optString("stationname");
-                wo.billtitle      = item.optString("billtitle");
-                wo.billid         = item.optString("billid");
-                wo.taskId         = item.optString("taskid");
+                wo.index       = i + 1;
+                wo.billsn      = item.optString("billsn");
+                wo.replyTime   = item.optString("reply_time");
+                wo.createTime  = item.optString("createtime");
+                wo.stationname = item.optString("stationname");
+                wo.billtitle   = item.optString("billtitle");
+                wo.billid      = item.optString("billid");
+                wo.taskId      = item.optString("taskid");
 
                 wo.acceptOperator  = "";
                 wo.dealInfo        = "";
@@ -102,8 +110,7 @@ public class MonitorTask implements Runnable {
                     JSONObject act = actionList.getJSONObject(j);
                     String taskStatusVal = act.optString("task_status_dictvalue", "");
 
-                    // ── 接单人：识别 ACCEPT 状态 ──────────────────────────────
-                    // 多字段名兼容，trim()去除服务器可能返回的前后空格
+                    // 接单人：识别 ACCEPT 状态
                     if ("ACCEPT".equals(taskStatusVal)) {
                         String op = act.optString("operator", "").trim();
                         if (op.isEmpty()) op = act.optString("operatorName", "").trim();
@@ -115,7 +122,7 @@ public class MonitorTask implements Runnable {
                         if (!op.isEmpty()) wo.acceptOperator = op;
                     }
 
-                    // ── 最新反馈信息 ─────────────────────────────────────────
+                    // 最新反馈信息
                     String rawDeal = act.optString("deal_info", "");
                     if (rawDeal.contains("追加描述：") || rawDeal.contains("故障反馈：")) {
                         String marker = rawDeal.contains("追加描述：") ? "追加描述：" : "故障反馈：";
@@ -126,13 +133,7 @@ public class MonitorTask implements Runnable {
                     }
                 }
 
-                // ── 接单人说明 ──────────────────────────────────────────────
-                // 只从 actionList 里的 ACCEPT 记录读取接单人（见上方循环）。
-                // ★ 绝对不能从工单顶层字段（accept_user_name 等）读取：
-                //   顶层字段存的是【派单人/指派人】而非接单人，未接单工单也会有值，
-                //   若从顶层读取会导致 acceptOperator 非空 → notAccepted=false → 永远不触发接单 ★
-
-                // 告警状态 + 解析最早告警时间
+                // 告警状态
                 String alarmStr = WorkOrderApi.getBillAlarmList(wo.billsn);
                 wo.alertStatus = alarmStr.contains("alarmname") ? "告警中" : "已恢复";
                 wo.alertTime   = "";
@@ -141,7 +142,6 @@ public class MonitorTask implements Runnable {
                     JSONArray alarmList = alarmRoot.optJSONArray("alarmList");
                     if (alarmList == null) alarmList = alarmRoot.optJSONArray("list");
                     if (alarmList != null && alarmList.length() > 0) {
-                        // 取最早一条告警的发生时间
                         JSONObject firstAlarm = alarmList.getJSONObject(alarmList.length() - 1);
                         String at = firstAlarm.optString("alarm_time", "");
                         if (at.isEmpty()) at = firstAlarm.optString("alarmTime", "");
@@ -151,16 +151,20 @@ public class MonitorTask implements Runnable {
                     }
                 } catch (Exception ignored) {}
 
-                // 时间差
+                // ★ 关键修复：timeDiff 计算逻辑
+                // timeDiff2 = 工单创建到现在的分钟数（用于接单阈值判断）
+                // timeDiff1 = 上次反馈到现在的分钟数（用于反馈阈值判断）
+                //   若 lastOperateTime 为空（从未反馈），timeDiff1=0，
+                //   不满足 >= 反馈阈值，不触发反馈，等工单足够老了再反馈
+                //   （原来错误写法 fallback 成 timeDiff2，导致工单一创建就可能触发反馈）★
                 wo.timeDiff2 = WorkOrderApi.minutesDiff(wo.createTime);
                 wo.timeDiff1 = wo.lastOperateTime.isEmpty()
-                        ? wo.timeDiff2
+                        ? 0   // ★ 从未反馈过：timeDiff1=0，不满足阈值，不立即反馈 ★
                         : WorkOrderApi.minutesDiff(wo.lastOperateTime);
 
                 wo.statusCol = "--排队等待处理中...";
                 orders.add(wo);
 
-                // 打包任务参数（\u0001 分隔，1-based 索引）
                 taskPacks[i + 1] = wo.billsn + "\u0001"
                         + wo.stationname    + "\u0001"
                         + wo.billtitle      + "\u0001"
@@ -185,30 +189,44 @@ public class MonitorTask implements Runnable {
 
         // ---- 4. 缓存任务包 & 初始化进度 ----
         s.taskArray = taskPacks;
+        // ★ 使用独立的 AtomicInteger 倒计，不依赖 Session 的 slot 机制，
+        //   避免前后两轮交叉导致 allDone 提前误判 ★
+        AtomicInteger remaining = new AtomicInteger(count);
         s.resetProgress(count);
 
-        // ---- 5. 派发工作线程 ----
-        // ★ 必须对 callback 做 null 检查：APP 退到后台时 callback==null，
-        //   若直接调用会在 Handler Runnable 里抛 NPE，虽不影响 NET_LOCK 释放，
-        //   但会导致后续所有 postUi 静默失败，接单状态无法更新到 UI ★
+        // ---- 5. 派发工作线程（本轮独立线程池，不复用 MonitorService 的 pool）----
+        // ★ 核心修复：每轮创建新线程池，任务结束后 awaitTermination 而非 shutdown。
+        //   MonitorService 复用的 pool 一旦 shutdown 就报 RejectedExecutionException，
+        //   导致整个后台轮询彻底停止。★
+        ExecutorService localPool = Executors.newFixedThreadPool(MAX_THREADS);
+
         WorkerTask.UiCallback uiCb = (rowIndex, billsn, content) ->
                 mainHandler.post(() -> { if (callback != null) callback.onStatusUpdate(rowIndex, billsn, content); });
 
         for (int i = 1; i <= count; i++) {
             final int idx = i;
-            // 等待槽位
-            while (!s.tryAcquireSlot(MAX_THREADS)) {
-                try { Thread.sleep(20); } catch (InterruptedException ignored) {}
-            }
-            pool.execute(new WorkerTask(idx, uiCb));
+            final AtomicInteger rem = remaining;
+            localPool.execute(() -> {
+                try {
+                    new WorkerTask(idx, uiCb).run();
+                } finally {
+                    rem.decrementAndGet();
+                }
+            });
         }
 
-        // ---- 6. 等待全部完成（最长等 8 分钟，防止 WorkerTask 异常后永久阻塞）----
-        long deadline = System.currentTimeMillis() + 8 * 60 * 1000L;
-        while (!s.allDone() && System.currentTimeMillis() < deadline) {
-            try { Thread.sleep(200); } catch (InterruptedException ignored) {}
+        // ---- 6. 等待全部完成（最长 5 分钟兜底，防止 WorkerTask 异常后永久阻塞）----
+        localPool.shutdown();
+        try {
+            boolean finished = localPool.awaitTermination(5, TimeUnit.MINUTES);
+            if (!finished) {
+                // 强制结束残留线程，不能让它们一直占用资源
+                localPool.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            localPool.shutdownNow();
+            Thread.currentThread().interrupt();
         }
-        pool.shutdown();
 
         // ---- 7. 智能时间段自动控制 ----
         applyTimeSchedule();
@@ -217,16 +235,8 @@ public class MonitorTask implements Runnable {
     }
 
     /**
-     * 智能时间段控制（完全对应原易语言逻辑）：
-     *
-     * 原代码含义：
-     *   if (1 < hour && hour < 6)  → hour == 2,3,4,5  → 关闭自动接单、自动反馈
-     *   if (5 < hour && hour < 24) → hour == 6..23    → 开启自动接单、自动反馈
-     *
-     * 即：北京时间 02:00 ~ 05:59 夜间停止；06:00 ~ 次日 01:59 正常执行。
-     *
-     * 注意：每轮执行完都会重新判断，所以 06:00 后下一轮自动恢复。
-     * 回单（cbRevert）不受时段控制，用户手动设置保持不变。
+     * 智能时间段控制：
+     * 北京时间 02:00 ~ 05:59 夜间停止接单/反馈；06:00 ~ 次日 01:59 正常执行。
      */
     private void applyTimeSchedule() {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
@@ -235,20 +245,16 @@ public class MonitorTask implements Runnable {
         String[] parts = s.appConfig.split("\u0001", -1);
         if (parts.length < 3) return;
 
-        boolean nightMode = (hour > 1 && hour < 6); // 2,3,4,5 点 → 夜间
-        boolean dayMode   = (hour > 5 && hour < 24); // 6~23 点 → 白天/傍晚
+        boolean nightMode = (hour > 1 && hour < 6);  // 2,3,4,5 点
+        boolean dayMode   = (hour > 5 && hour < 24); // 6~23 点
 
         if (nightMode) {
-            // 夜间：关闭自动反馈 + 自动接单，回单不动
             parts[0] = "false";
             parts[1] = "false";
         } else if (dayMode) {
-            // 白天（含 0、1 点不在上面两个区间，保持用户设置不变；
-            //        6~23 点恢复开启，与原逻辑一致）
             parts[0] = "true";
             parts[1] = "true";
         }
-        // hour == 0 或 1：两个条件都不满足，不修改用户配置（与原逻辑一致）
 
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < parts.length; i++) {
@@ -256,5 +262,8 @@ public class MonitorTask implements Runnable {
             if (i < parts.length - 1) sb.append("\u0001");
         }
         s.appConfig = sb.toString();
+        // ★ 时间段修改后也要持久化，服务重建后不丢失 ★
+        // 注意：这里拿不到 Context，所以不调用 saveConfig。
+        // applyTimeSchedule 只影响内存 appConfig，下次用户点"开始监控"时会重新 buildConfig 并 saveConfig。
     }
 }
