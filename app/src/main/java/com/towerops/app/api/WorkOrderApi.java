@@ -118,7 +118,16 @@ public class WorkOrderApi {
                 + "&c_account="     + s.userid
                 + "&c_sign=437C91584844E7AB0BECF79BDF0D2B94"
                 + "&upvs=" + UPVS;
-        return HttpUtil.post(url, post, s.authHeader, null);
+        // ★ 接单接口需要完整协议头（含 Host），与回单保持一致，
+        //   仅用 s.authHeader 在后台时可能因缺少 Host 被服务器拒绝 ★
+        String header = "Authorization: " + s.token + "\n"
+                + "equiptoken: \n"
+                + "appVer: 202112\n"
+                + "Content-Type: application/x-www-form-urlencoded\n"
+                + "Host: ywapp.chinatowercom.cn:58090\n"
+                + "Connection: Keep-Alive\n"
+                + "User-Agent: okhttp/4.10.0";
+        return HttpUtil.post(url, post, header, null);
     }
 
     // =====================================================================
