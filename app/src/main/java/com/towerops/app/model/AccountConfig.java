@@ -23,7 +23,7 @@ public class AccountConfig {
      * ★ 不确定的话，先前台手动接一单，看工单详情里接单人显示什么就填什么 ★
      */
     public static final String[][] ACCOUNTS = {
-            {"wx-linjy22",       "z0J1CVrRPjfQgO4jhLuJwg%3D%3D",  "林甲雨宇"},
+            {"wx-linjy22",       "z0J1CVrRPjfQgO4jhLuJwg%3D%3D",  "林甲雨"},
             {"wx-liujj6",        "MwAPfB0gVI3Ddfk%2BByiG3Q%3D%3D","王俊杰"},
             {"wx-linyl",         "z0J1CVrRPjfQgO4jhLuJwg%3D%3D",  "林元龙"},
             {"wx-maoll5",        "z0J1CVrRPjfQgO4jhLuJwg%3D%3D",  "毛露露"},
