@@ -1,4 +1,3 @@
-
 package com.towerops.app.ui;
 
 import android.graphics.Color;
@@ -14,28 +13,57 @@ import com.towerops.app.R;
 import com.towerops.app.model.WorkOrder;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class WorkOrderAdapter extends RecyclerView.Adapter<WorkOrderAdapter.VH> {
 
+    /** 排序模式 */
+    public enum SortMode {
+        BILL_TIME_DESC,     // 工单历时 大→小（默认）
+        FEEDBACK_TIME_DESC, // 反馈历时 大→小
+        FEEDBACK_TIME_ASC   // 反馈历时 小→大
+    }
+
     private final List<WorkOrder> data = new ArrayList<>();
+    private SortMode sortMode = SortMode.BILL_TIME_DESC; // 默认：工单历时从大到小
+
+    /** 设置排序模式并立即刷新列表 */
+    public void setSortMode(SortMode mode) {
+        this.sortMode = mode;
+        applySort();
+        notifyDataSetChanged();
+    }
+
+    public SortMode getSortMode() { return sortMode; }
 
     public void setData(List<WorkOrder> list) {
         data.clear();
         data.addAll(list);
+        applySort();
         notifyDataSetChanged();
     }
 
-    /** 按 billsn 更新某行的状态列 */
-    public void updateStatus(int rowHint, String billsn, String content) {
-        // 快速路径
-        if (rowHint >= 0 && rowHint < data.size()
-                && billsn.equals(data.get(rowHint).billsn)) {
-            data.get(rowHint).statusCol = content;
-            notifyItemChanged(rowHint);
-            return;
+    /** 内部排序（不改原始数据顺序，只对 data 排序） */
+    private void applySort() {
+        switch (sortMode) {
+            case BILL_TIME_DESC:
+                // 工单历时（timeDiff2）从大到小
+                Collections.sort(data, (a, b) -> b.timeDiff2 - a.timeDiff2);
+                break;
+            case FEEDBACK_TIME_DESC:
+                // 反馈历时（timeDiff1）从大到小
+                Collections.sort(data, (a, b) -> b.timeDiff1 - a.timeDiff1);
+                break;
+            case FEEDBACK_TIME_ASC:
+                // 反馈历时（timeDiff1）从小到大
+                Collections.sort(data, (a, b) -> a.timeDiff1 - b.timeDiff1);
+                break;
         }
-        // 全表搜索
+    }
+
+    /** 按 billsn 更新某行的状态列（排序后行位置可能变化，始终全表搜索）*/
+    public void updateStatus(int rowHint, String billsn, String content) {
         for (int i = 0; i < data.size(); i++) {
             if (billsn.equals(data.get(i).billsn)) {
                 data.get(i).statusCol = content;
