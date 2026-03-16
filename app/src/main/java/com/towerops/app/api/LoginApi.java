@@ -9,6 +9,15 @@ import org.json.JSONObject;
 
 /**
  * 登录相关 API —— 对应易语言按钮59（获取验证码）和按钮51（PIN码登录）
+ *
+ * [BUG-FIX] userid/c_account 硬编码问题
+ *   原代码：发短信(4A_LOGIN_SMS_SEND)和PIN登录(4A_LOGIN_CHECK_PIN)的 URL 及 POST 里
+ *           userid 和 c_account 全部硬编码为 "2662936450"，不管选哪个账号登录
+ *           都用这个固定 ID 请求，导致服务器返回的 token/userid 对应的是该固定账号，
+ *           而不是当前选中的账号，造成后台接单时身份错乱。
+ *   修复：改为动态使用当前 account 字段作为 c_account，
+ *         URL 中的 userid 参数使用临时占位值（服务器在未登录时不校验该字段），
+ *         登录成功后 Session.userid 由服务器返回的真实 userid 覆盖。
  */
 public class LoginApi {
 
@@ -60,7 +69,8 @@ public class LoginApi {
 
         // --- 第二步：发送短信 ---
         ts = TimeUtil.getCurrentTimestamp();
-        String url2  = BASE + "?porttype=4A_LOGIN_SMS_SEND&v=1.0.93&userid=2662936450&c=0";
+        // [BUG-FIX] userid 和 c_account 由硬编码改为动态使用当前 account
+        String url2  = BASE + "?porttype=4A_LOGIN_SMS_SEND&v=1.0.93&userid=" + account + "&c=0";
         String post2 = "loginName="     + account
                 + "&password="          + password
                 + "&loginVersion=202206"
@@ -69,7 +79,7 @@ public class LoginApi {
                 + "&softversion=1.0.93"
                 + "&phoneinfo=M2011K2C"
                 + "&c_timestamp="       + ts
-                + "&c_account=2662936450"
+                + "&c_account="         + account
                 + "&c_sign="            + sign
                 + "&upvs=2025-03-15-ccssoft";
 
@@ -103,7 +113,8 @@ public class LoginApi {
         String ts   = TimeUtil.getCurrentTimestamp();
         String sign = SignUtil.buildLoginSign(account, ts);
 
-        String url  = BASE + "?porttype=4A_LOGIN_CHECK_PIN&v=1.0.93&userid=2662936450&c=0";
+        // [BUG-FIX] userid 和 c_account 由硬编码改为动态使用当前 account
+        String url  = BASE + "?porttype=4A_LOGIN_CHECK_PIN&v=1.0.93&userid=" + account + "&c=0";
         String post = "loginName="     + account
                 + "&password="         + password
                 + "&loginVersion=202206"
@@ -115,7 +126,7 @@ public class LoginApi {
                 + "&pin="              + pin
                 + "&pushtype=1"
                 + "&c_timestamp="      + ts
-                + "&c_account=2662936450"
+                + "&c_account="        + account
                 + "&c_sign="           + sign
                 + "&upvs=2025-03-15-ccssoft";
 
