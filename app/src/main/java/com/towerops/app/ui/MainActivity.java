@@ -31,7 +31,8 @@ public class MainActivity extends AppCompatActivity {
 
     // UI 控件
     private TextView        tvUserInfo, tvProgress, tvNextRun;
-    private TextView        btnSortBillTime, btnSortFeedbackTime, tvSortDesc;
+    private TextView        btnSortBillTime, btnSortFeedbackTime,
+                            btnSortAlertTime, btnSortAlertStatus, tvSortDesc;
     private CheckBox        cbFeedback, cbAccept, cbRevert;
     private EditText        etFbMin, etFbMax, etAccMin, etAccMax, etIntMin, etIntMax;
     private Button          btnStart, btnStop;
@@ -200,6 +201,8 @@ public class MainActivity extends AppCompatActivity {
         tvNextRun          = findViewById(R.id.tvNextRun);
         btnSortBillTime    = findViewById(R.id.btnSortBillTime);
         btnSortFeedbackTime= findViewById(R.id.btnSortFeedbackTime);
+        btnSortAlertTime   = findViewById(R.id.btnSortAlertTime);
+        btnSortAlertStatus = findViewById(R.id.btnSortAlertStatus);
         tvSortDesc         = findViewById(R.id.tvSortDesc);
         cbFeedback = findViewById(R.id.cbAutoFeedback);
         cbAccept   = findViewById(R.id.cbAutoAccept);
@@ -222,9 +225,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupSortButtons() {
-        // 工单历时排序（始终大→小，点击只刷新高亮）
+        // 工单历时排序（点击在 大→小 / 小→大 之间切换）
         btnSortBillTime.setOnClickListener(v -> {
-            adapter.setSortMode(WorkOrderAdapter.SortMode.BILL_TIME_DESC);
+            WorkOrderAdapter.SortMode cur = adapter.getSortMode();
+            if (cur == WorkOrderAdapter.SortMode.BILL_TIME_DESC) {
+                adapter.setSortMode(WorkOrderAdapter.SortMode.BILL_TIME_ASC);
+            } else {
+                adapter.setSortMode(WorkOrderAdapter.SortMode.BILL_TIME_DESC);
+            }
             updateSortUI();
         });
 
@@ -238,33 +246,87 @@ public class MainActivity extends AppCompatActivity {
             }
             updateSortUI();
         });
+
+        // 告警时间排序（点击在 最新→最旧 / 最旧→最新 之间切换）
+        btnSortAlertTime.setOnClickListener(v -> {
+            WorkOrderAdapter.SortMode cur = adapter.getSortMode();
+            if (cur == WorkOrderAdapter.SortMode.ALERT_TIME_DESC) {
+                adapter.setSortMode(WorkOrderAdapter.SortMode.ALERT_TIME_ASC);
+            } else {
+                adapter.setSortMode(WorkOrderAdapter.SortMode.ALERT_TIME_DESC);
+            }
+            updateSortUI();
+        });
+
+        // 告警状态排序（点击在 告警中优先 / 已恢复优先 之间切换）
+        btnSortAlertStatus.setOnClickListener(v -> {
+            WorkOrderAdapter.SortMode cur = adapter.getSortMode();
+            if (cur == WorkOrderAdapter.SortMode.ALERT_STATUS_ALARM) {
+                adapter.setSortMode(WorkOrderAdapter.SortMode.ALERT_STATUS_RECOVER);
+            } else {
+                adapter.setSortMode(WorkOrderAdapter.SortMode.ALERT_STATUS_ALARM);
+            }
+            updateSortUI();
+        });
+
+        // 初始化排序 UI 显示
+        updateSortUI();
     }
 
     /** 根据当前排序模式更新按钮高亮和说明文字 */
     private void updateSortUI() {
         WorkOrderAdapter.SortMode mode = adapter.getSortMode();
-        // 重置颜色
+        // 全部重置为暗色
         btnSortBillTime.setTextColor(0xffa0a0c0);
         btnSortFeedbackTime.setTextColor(0xffa0a0c0);
+        btnSortAlertTime.setTextColor(0xffa0a0c0);
+        btnSortAlertStatus.setTextColor(0xffa0a0c0);
+        // 重置箭头（工单历时、告警时间、告警状态都支持双向切换，统一用 ↕）
+        btnSortBillTime.setText("工单历时 ↕");
+        btnSortFeedbackTime.setText("反馈历时 ↕");
+        btnSortAlertTime.setText("告警时间 ↕");
+        btnSortAlertStatus.setText("告警状态 ↕");
 
         switch (mode) {
             case BILL_TIME_DESC:
                 btnSortBillTime.setText("工单历时 ↓");
                 btnSortBillTime.setTextColor(0xffffffff);
-                btnSortFeedbackTime.setText("反馈历时 ↕");
                 tvSortDesc.setText("工单历时 大→小");
+                break;
+            case BILL_TIME_ASC:
+                btnSortBillTime.setText("工单历时 ↑");
+                btnSortBillTime.setTextColor(0xffffffff);
+                tvSortDesc.setText("工单历时 小→大");
                 break;
             case FEEDBACK_TIME_DESC:
                 btnSortFeedbackTime.setText("反馈历时 ↓");
                 btnSortFeedbackTime.setTextColor(0xffffffff);
-                btnSortBillTime.setText("工单历时 ↓");
                 tvSortDesc.setText("反馈历时 大→小");
                 break;
             case FEEDBACK_TIME_ASC:
                 btnSortFeedbackTime.setText("反馈历时 ↑");
                 btnSortFeedbackTime.setTextColor(0xffffffff);
-                btnSortBillTime.setText("工单历时 ↓");
                 tvSortDesc.setText("反馈历时 小→大");
+                break;
+            case ALERT_TIME_DESC:
+                btnSortAlertTime.setText("告警时间 ↓");
+                btnSortAlertTime.setTextColor(0xffffffff);
+                tvSortDesc.setText("告警时间 最新→最旧");
+                break;
+            case ALERT_TIME_ASC:
+                btnSortAlertTime.setText("告警时间 ↑");
+                btnSortAlertTime.setTextColor(0xffffffff);
+                tvSortDesc.setText("告警时间 最旧→最新");
+                break;
+            case ALERT_STATUS_ALARM:
+                btnSortAlertStatus.setText("告警中优先 ↓");
+                btnSortAlertStatus.setTextColor(0xffff6b35);
+                tvSortDesc.setText("告警中优先");
+                break;
+            case ALERT_STATUS_RECOVER:
+                btnSortAlertStatus.setText("已恢复优先 ↓");
+                btnSortAlertStatus.setTextColor(0xff40c080);
+                tvSortDesc.setText("已恢复优先");
                 break;
         }
     }
