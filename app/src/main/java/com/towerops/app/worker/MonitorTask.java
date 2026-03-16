@@ -101,8 +101,10 @@ public class MonitorTask implements Runnable {
                 for (int j = 0; j < actionList.length(); j++) {
                     JSONObject act = actionList.getJSONObject(j);
                     String taskStatusVal = act.optString("task_status_dictvalue", "");
+
+                    // ── 接单人：只认 ACCEPT 状态，不做兜底猜测 ──────────────
+                    // 无接单人 → acceptOperator 保持空串 → 界面显示"未接单"
                     if ("ACCEPT".equals(taskStatusVal)) {
-                        // 兼容多种字段名：operator / operatorName / operName / handle_user_name
                         String op = act.optString("operator", "");
                         if (op.isEmpty()) op = act.optString("operatorName", "");
                         if (op.isEmpty()) op = act.optString("operName", "");
@@ -110,14 +112,8 @@ public class MonitorTask implements Runnable {
                         if (op.isEmpty()) op = act.optString("handleUserName", "");
                         if (!op.isEmpty()) wo.acceptOperator = op;
                     }
-                    // 只要 actionlist 非空且有 ACCEPT 记录，也标记为已接单（兜底）
-                    if (wo.acceptOperator.isEmpty() && !taskStatusVal.isEmpty()
-                            && !"SUBMIT".equals(taskStatusVal)
-                            && !"CREATE".equals(taskStatusVal)) {
-                        String op = act.optString("operator", "");
-                        if (op.isEmpty()) op = act.optString("handle_user_name", "");
-                        if (!op.isEmpty()) wo.acceptOperator = op;
-                    }
+
+                    // ── 最新反馈信息 ─────────────────────────────────────────
                     String rawDeal = act.optString("deal_info", "");
                     if (rawDeal.contains("追加描述：") || rawDeal.contains("故障反馈：")) {
                         String marker = rawDeal.contains("追加描述：") ? "追加描述：" : "故障反馈：";
@@ -173,6 +169,7 @@ public class MonitorTask implements Runnable {
 
         for (int i = 1; i <= count; i++) {
             final int idx = i;
+            // 等待槽位
             while (!s.tryAcquireSlot(MAX_THREADS)) {
                 try { Thread.sleep(20); } catch (InterruptedException ignored) {}
             }
@@ -192,8 +189,16 @@ public class MonitorTask implements Runnable {
     }
 
     /**
-     * 智能时间段：凌晨 01~05 点自动关闭
-     * 其余时间不强制修改用户配置
+     * 智能时间段控制（完全对应原易语言逻辑）：
+     *
+     * 原代码含义：
+     *   if (1 < hour && hour < 6)  → hour == 2,3,4,5  → 关闭自动接单、自动反馈
+     *   if (5 < hour && hour < 24) → hour == 6..23    → 开启自动接单、自动反馈
+     *
+     * 即：北京时间 02:00 ~ 05:59 夜间停止；06:00 ~ 次日 01:59 正常执行。
+     *
+     * 注意：每轮执行完都会重新判断，所以 06:00 后下一轮自动恢复。
+     * 回单（cbRevert）不受时段控制，用户手动设置保持不变。
      */
     private void applyTimeSchedule() {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
@@ -202,17 +207,26 @@ public class MonitorTask implements Runnable {
         String[] parts = s.appConfig.split("\u0001", -1);
         if (parts.length < 3) return;
 
-        // 只在凌晨1~6点之间暂停自动操作（防止夜间误触发）
-        if (hour >= 1 && hour < 6) {
+        boolean nightMode = (hour > 1 && hour < 6); // 2,3,4,5 点 → 夜间
+        boolean dayMode   = (hour > 5 && hour < 24); // 6~23 点 → 白天/傍晚
+
+        if (nightMode) {
+            // 夜间：关闭自动反馈 + 自动接单，回单不动
             parts[0] = "false";
             parts[1] = "false";
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < parts.length; i++) {
-                sb.append(parts[i]);
-                if (i < parts.length - 1) sb.append("\u0001");
-            }
-            s.appConfig = sb.toString();
+        } else if (dayMode) {
+            // 白天（含 0、1 点不在上面两个区间，保持用户设置不变；
+            //        6~23 点恢复开启，与原逻辑一致）
+            parts[0] = "true";
+            parts[1] = "true";
         }
-        // 注意：不再在 hour>=6 时强制改为 true，避免覆盖用户手动关闭的状态
+        // hour == 0 或 1：两个条件都不满足，不修改用户配置（与原逻辑一致）
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < parts.length; i++) {
+            sb.append(parts[i]);
+            if (i < parts.length - 1) sb.append("\u0001");
+        }
+        s.appConfig = sb.toString();
     }
 }
