@@ -251,7 +251,13 @@ public class MonitorService extends Service {
 
             @Override
             public void onStatusUpdate(int rowIndex, String billsn, String content) {
-                if (snap != null && !silentMode) {
+                // 后台静默时：接单成功/失败仍通过通知栏显示，其他状态静默
+                if (silentMode) {
+                    if (content.contains("接单成功") || content.contains("接单失败")
+                            || content.contains("服务器响应")) {
+                        updateNotification(billsn + " " + content);
+                    }
+                } else if (snap != null) {
                     mainHandler.post(() -> snap.onStatusUpdate(rowIndex, billsn, content));
                 }
             }
