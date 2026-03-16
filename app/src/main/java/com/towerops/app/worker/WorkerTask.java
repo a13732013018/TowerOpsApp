@@ -143,11 +143,37 @@ public class WorkerTask implements Runnable {
                 sleep(randInt(2000, 4000));
                 postUi(rowIndex, billsn, "点击接单...");
                 sleep(randInt(1000, 2000));
-                String acceptResult = WorkOrderApi.acceptBill(billid, billsn, taskId);
-                if (acceptResult.contains("OK") || acceptResult.contains("success")) {
+
+                // ★ 接单最多重试2次：前后台均有效，不依赖 UI 回调 ★
+                String acceptResult = "";
+                boolean acceptOk = false;
+                for (int attempt = 1; attempt <= 2; attempt++) {
+                    acceptResult = WorkOrderApi.acceptBill(billid, billsn, taskId);
+                    // 判断成功：含 OK / success / 接单成功
+                    if (acceptResult.contains("OK")
+                            || acceptResult.contains("success")
+                            || acceptResult.contains("接单成功")) {
+                        acceptOk = true;
+                        break;
+                    }
+                    // 若返回"已接单"说明已经接过，当作成功处理
+                    if (acceptResult.contains("已接单") || acceptResult.contains("重复")) {
+                        acceptOk = true;
+                        break;
+                    }
+                    if (attempt < 2) {
+                        // 第一次失败后等待 3~5 秒再重试
+                        postUi(rowIndex, billsn, "接单第" + attempt + "次失败，重试...");
+                        sleep(randInt(3000, 5000));
+                    }
+                }
+
+                if (acceptOk) {
                     postUi(rowIndex, billsn, "接单成功 ✓");
                 } else {
-                    postUi(rowIndex, billsn, "接单完毕:" + acceptResult.substring(0, Math.min(40, acceptResult.length())));
+                    // 输出完整返回值（最多80字符）便于排查服务器拒绝原因
+                    String brief = acceptResult.replaceAll("[\\r\\n]", " ");
+                    postUi(rowIndex, billsn, "接单失败:" + brief.substring(0, Math.min(80, brief.length())));
                 }
             } finally {
                 NET_LOCK.unlock();
@@ -282,8 +308,18 @@ public class WorkerTask implements Runnable {
 
     // ---- 辅助方法 ----
 
+    /**
+     * 向主线程 UI 回调状态。
+     * ★ 必须对 uiCallback 做 null 检查：极端情况下（如后台 GC 或服务重建）
+     *   uiCallback 可能为 null，直接调用会在 Handler Runnable 里抛 NPE，
+     *   虽然不影响 NET_LOCK 释放（finally 保证），但会让接单结果静默丢失。★
+     * 接单/反馈/回单 的网络请求本身完全不依赖此方法，后台时跳过 UI 更新即可。
+     */
     private void postUi(int row, String billsn, String msg) {
-        mainHandler.post(() -> uiCallback.updateStatus(row, billsn, msg));
+        if (uiCallback == null) return;
+        mainHandler.post(() -> {
+            if (uiCallback != null) uiCallback.updateStatus(row, billsn, msg);
+        });
     }
 
     private static void sleep(int ms) {
