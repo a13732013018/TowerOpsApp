@@ -30,15 +30,19 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * 前台服务 —— 保活核心（终极版）
+ * 前台服务 —— 保活核心（终极双引擎版）
  *
- * 保活方案：
- *  1. 前台服务（通知栏常驻） → 系统轻易不杀
- *  2. AlarmManager.setExactAndAllowWhileIdle → 息屏/打盹模式下也能精准触发
- *  3. WakeLock（带超时保护）→ 任务期间 CPU 不睡眠
- *  4. START_STICKY → 被杀后自动重启
- *  5. BootReceiver → 开机后自动拉起
- *  6. SharedPreferences 持久化运行状态 → 服务重启后自动恢复轮询
+ * 修复的根本问题：
+ *   原版 monitorOn 是内存 volatile 变量，服务被 START_STICKY 重建后恢复为 false，
+ *   导致 AlarmManager 触发时因 monitorOn==false 而跳过执行，彻底停止轮询。
+ *
+ * 解决方案：
+ *   1. monitorOn 状态以 SharedPreferences 为唯一权威来源，内存变量只作缓存
+ *   2. 每次 onStartCommand 都重新从 prefs 读取状态
+ *   3. 双引擎保活：AlarmManager（主引擎）+ Handler 心跳（兜底引擎）
+ *      - AlarmManager：setExactAndAllowWhileIdle，息屏 Doze 下也能准时唤醒
+ *      - Handler 心跳：APP 在前台时每 5 秒检测一次，防止 Alarm 被系统吞掉
+ *   4. 任务执行完成后无论如何都重新调度下一轮
  */
 public class MonitorService extends Service {
 
@@ -48,11 +52,12 @@ public class MonitorService extends Service {
     public static final String PREF_RUNNING         = "is_running";
     public static final String PREF_INT_MIN         = "interval_min";
     public static final String PREF_INT_MAX         = "interval_max";
+    public static final String PREF_NEXT_RUN_AT     = "next_run_at";   // 下次执行时间戳(ms)
 
-    private static final String CHANNEL_ID  = "tower_ops_monitor";
-    private static final int    NOTIF_ID    = 1001;
-    // WakeLock 最长持有 10 分钟，防止任务卡死导致永远不释放
-    private static final long   WAKELOCK_TIMEOUT_MS = 10 * 60 * 1000L;
+    private static final String CHANNEL_ID          = "tower_ops_monitor";
+    private static final int    NOTIF_ID            = 1001;
+    private static final long   WAKELOCK_TIMEOUT_MS = 10 * 60 * 1000L; // 10分钟
+    private static final long   HEARTBEAT_MS        = 5_000L;           // 心跳间隔5秒
 
     // ── Binder ─────────────────────────────────────────────────────────────
     public class LocalBinder extends Binder {
@@ -60,7 +65,7 @@ public class MonitorService extends Service {
     }
     private final IBinder binder = new LocalBinder();
 
-    // ── 回调接口（绑定后由 MainActivity 设置，退到后台置 null）─────────────
+    // ── 回调接口 ────────────────────────────────────────────────────────────
     public interface ServiceCallback {
         void onOrdersReady(List<WorkOrder> orders);
         void onStatusUpdate(int rowIndex, String billsn, String content);
@@ -71,8 +76,7 @@ public class MonitorService extends Service {
     private volatile ServiceCallback callback;
 
     // ── 状态 ───────────────────────────────────────────────────────────────
-    private volatile boolean  taskRunning  = false;  // 当前是否正在跑任务
-    private volatile boolean  monitorOn    = false;  // 是否开启了轮询
+    private volatile boolean  taskRunning  = false;
     private final Handler     mainHandler  = new Handler(Looper.getMainLooper());
     private final ExecutorService pool     = Executors.newCachedThreadPool();
     private final Random      random       = new Random();
@@ -80,6 +84,22 @@ public class MonitorService extends Service {
     private PowerManager.WakeLock wakeLock;
     private AlarmManager          alarmManager;
     private SharedPreferences     prefs;
+
+    // 心跳 Runnable：每 5 秒检查一次，如果应该跑但没跑就立刻启动
+    private final Runnable heartbeat = new Runnable() {
+        @Override
+        public void run() {
+            if (isRunning() && !taskRunning) {
+                long nextAt = prefs.getLong(PREF_NEXT_RUN_AT, 0);
+                if (System.currentTimeMillis() >= nextAt) {
+                    // 超时未触发（Alarm 被吞），心跳兜底启动
+                    runOnce();
+                }
+            }
+            // 只要服务存在就持续心跳
+            mainHandler.postDelayed(this, HEARTBEAT_MS);
+        }
+    };
 
     // ── 生命周期 ────────────────────────────────────────────────────────────
 
@@ -89,38 +109,36 @@ public class MonitorService extends Service {
         prefs        = getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         alarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
 
-        // 初始化通知渠道
         createNotificationChannel();
 
-        // 初始化 WakeLock（带超时）
         PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TowerOps:MonitorWakeLock");
         wakeLock.setReferenceCounted(false);
+
+        // 启动心跳
+        mainHandler.postDelayed(heartbeat, HEARTBEAT_MS);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // 立即提升为前台服务，防止被杀
+        // 立即提升为前台服务
         startForeground(NOTIF_ID, buildNotification("监控运行中，自动处理工单..."));
 
-        // 确保 WakeLock 持有（超时自动释放兜底）
+        // 确保 WakeLock 持有
         if (!wakeLock.isHeld()) {
             wakeLock.acquire(WAKELOCK_TIMEOUT_MS);
         }
 
-        // 处理 AlarmManager 触发的轮询
-        if (ACTION_ALARM_TRIGGER.equals(intent != null ? intent.getAction() : null)) {
-            // 闹钟触发：执行一次任务，完成后再设置下一个闹钟
-            if (monitorOn && !taskRunning) {
-                runOnce();
-            }
-        } else {
-            // 普通启动 or START_STICKY 重启：恢复上次的运行状态
-            boolean wasRunning = prefs.getBoolean(PREF_RUNNING, false);
-            if (wasRunning && !monitorOn) {
-                monitorOn = true;
-                if (!taskRunning) runOnce();
-            }
+        // ★ 关键修复：不再依赖内存 monitorOn，直接读 prefs 判断是否应该运行 ★
+        boolean shouldRun = prefs.getBoolean(PREF_RUNNING, false);
+
+        if (shouldRun && !taskRunning) {
+            // 无论是 AlarmManager 触发、START_STICKY 重建、还是 BootReceiver 拉起
+            // 只要 prefs 里记录的是运行状态就直接执行
+            runOnce();
+        } else if (!shouldRun) {
+            // 已停止状态，释放 WakeLock
+            if (wakeLock.isHeld()) wakeLock.release();
         }
 
         return START_STICKY;
@@ -132,6 +150,7 @@ public class MonitorService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        mainHandler.removeCallbacks(heartbeat);
         cancelAlarm();
         pool.shutdownNow();
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
@@ -141,6 +160,13 @@ public class MonitorService extends Service {
 
     public void setCallback(ServiceCallback cb) {
         this.callback = cb;
+        // 回调重新注册时，如果正在运行就刷新一次按钮/进度状态
+        if (cb != null && isRunning()) {
+            int delaySec = getRemainingSeconds();
+            if (delaySec > 0) {
+                mainHandler.post(() -> { if (callback != null) callback.onNextRun(delaySec); });
+            }
+        }
     }
 
     public void setInterval(int minSec, int maxSec) {
@@ -150,35 +176,40 @@ public class MonitorService extends Service {
                 .apply();
     }
 
-    public boolean isRunning() { return monitorOn; }
+    /** 是否正在轮询（以 prefs 为准，不依赖内存变量）*/
+    public boolean isRunning() {
+        return prefs.getBoolean(PREF_RUNNING, false);
+    }
 
     public void startMonitor() {
-        if (monitorOn) return;
-        monitorOn = true;
-        // 持久化：服务重启后自动恢复
+        if (isRunning()) return;
+        // ★ 先写 prefs，再执行，确保重建后状态一致 ★
         prefs.edit().putBoolean(PREF_RUNNING, true).apply();
         updateNotification("监控运行中，自动处理工单...");
         if (!taskRunning) runOnce();
     }
 
     public void stopMonitor() {
-        monitorOn = false;
-        prefs.edit().putBoolean(PREF_RUNNING, false).apply();
+        prefs.edit()
+                .putBoolean(PREF_RUNNING, false)
+                .putLong(PREF_NEXT_RUN_AT, 0)
+                .apply();
         cancelAlarm();
+        taskRunning = false;
         updateNotification("监控已暂停");
+        if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
     }
 
     // ── 核心轮询逻辑 ────────────────────────────────────────────────────────
 
     private void runOnce() {
-        if (!monitorOn) return;
+        if (!isRunning()) return;          // 双重检查
+        if (taskRunning) return;           // 防重入
         taskRunning = true;
 
-        // 确保服务自己的 WakeLock 持有
         if (!wakeLock.isHeld()) {
             wakeLock.acquire(WAKELOCK_TIMEOUT_MS);
         }
-        // 释放 AlarmReceiver 的临时 WakeLock（服务 WakeLock 已接管）
         AlarmReceiver.releaseWakeLock();
 
         pool.execute(new MonitorTask(new MonitorTask.MonitorCallback() {
@@ -197,10 +228,11 @@ public class MonitorService extends Service {
             public void onAllDone() {
                 int done  = Session.get().getFinished();
                 int total = Session.get().getTotal();
+                // ★ callback 可能为 null（APP 在后台），但任务完成必须继续调度 ★
                 if (callback != null) callback.onAllDone(done, total);
                 taskRunning = false;
-                // 任务完成后，通过 AlarmManager 安排下次执行
-                if (monitorOn) scheduleNextAlarm();
+                // 无条件安排下一轮（不判断 monitorOn 内存变量）
+                if (isRunning()) scheduleNextRun();
             }
 
             @Override
@@ -208,36 +240,40 @@ public class MonitorService extends Service {
                 updateNotification("错误：" + msg);
                 if (callback != null) callback.onError(msg);
                 taskRunning = false;
-                // 出错也安排下次重试
-                if (monitorOn) scheduleNextAlarm();
+                // 出错也继续调度，不能停
+                if (isRunning()) scheduleNextRun();
             }
         }));
     }
 
     /**
-     * 用 AlarmManager 设置下次触发时间。
-     * setExactAndAllowWhileIdle 在 Doze 模式（打盹/息屏）下也能准时触发。
+     * 安排下次执行：
+     * - 记录下次执行时间到 prefs（心跳引擎用于超时检测）
+     * - 设置 AlarmManager（主引擎）
      */
-    private void scheduleNextAlarm() {
-        int minSec = prefs.getInt(PREF_INT_MIN, 90);
-        int maxSec = prefs.getInt(PREF_INT_MAX, 120);
+    private void scheduleNextRun() {
+        int minSec   = prefs.getInt(PREF_INT_MIN, 90);
+        int maxSec   = prefs.getInt(PREF_INT_MAX, 120);
         int delaySec = minSec + random.nextInt(Math.max(1, maxSec - minSec + 1));
 
+        // ★ 记录下次执行绝对时间，心跳兜底用 ★
+        long nextAt = System.currentTimeMillis() + delaySec * 1000L;
+        prefs.edit().putLong(PREF_NEXT_RUN_AT, nextAt).apply();
+
         updateNotification("下次轮询：" + delaySec + "秒后");
-        if (callback != null) {
-            mainHandler.post(() -> {
-                if (callback != null) callback.onNextRun(delaySec);
-            });
-        }
+
+        // 通知 UI 刷新倒计时（即使 callback 当前为 null 也不影响调度）
+        final int ds = delaySec;
+        mainHandler.post(() -> { if (callback != null) callback.onNextRun(ds); });
 
         // 释放 WakeLock，等待下次触发
         if (wakeLock.isHeld()) wakeLock.release();
 
+        // 设置 AlarmManager
         PendingIntent pi = buildAlarmPendingIntent();
         long triggerAt = SystemClock.elapsedRealtime() + delaySec * 1000L;
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            // Android 6+：setExactAndAllowWhileIdle 在 Doze 模式下也能触发
             alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pi);
         } else {
@@ -251,10 +287,6 @@ public class MonitorService extends Service {
     }
 
     private PendingIntent buildAlarmPendingIntent() {
-        // 使用 getBroadcast → AlarmReceiver，而非 getService
-        // 原因：国内 ROM 在 Doze 模式下对 startService 有额外节流，
-        //       BroadcastReceiver.onReceive() 优先级更高，且能在 onReceive 里
-        //       立刻拿 WakeLock，保证 CPU 不在服务启动前重新睡眠。
         Intent i = new Intent(this, AlarmReceiver.class);
         i.setAction(ACTION_ALARM_TRIGGER);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
@@ -262,6 +294,13 @@ public class MonitorService extends Service {
             flags |= PendingIntent.FLAG_IMMUTABLE;
         }
         return PendingIntent.getBroadcast(this, 0, i, flags);
+    }
+
+    /** 获取距下次执行的剩余秒数（供 UI 恢复显示用）*/
+    private int getRemainingSeconds() {
+        long nextAt = prefs.getLong(PREF_NEXT_RUN_AT, 0);
+        long diff   = nextAt - System.currentTimeMillis();
+        return diff > 0 ? (int)(diff / 1000) : 0;
     }
 
     // ── 通知相关 ──────────────────────────────────────────────────────────
@@ -301,9 +340,8 @@ public class MonitorService extends Service {
         if (nm != null) nm.notify(NOTIF_ID, n);
     }
 
-    // ── 静态工具：供外部组件启动服务 ─────────────────────────────────────────
+    // ── 静态工具 ──────────────────────────────────────────────────────────
 
-    /** 从任意 Context 启动/唤醒监控服务 */
     public static void startSelf(Context ctx) {
         Intent i = new Intent(ctx, MonitorService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
