@@ -116,7 +116,7 @@ public class WorkOrderApi {
                 + "&handlerResult=%E6%89%8B%E6%9C%BA%E6%8E%A5%E5%8D%95"
                 + "&c_timestamp="   + ts
                 + "&c_account="     + s.userid
-                + "&c_sign=437C91584844E7AB0BECF79BDF0D2B94"
+                + "&c_sign=437C91584844E7AB0BECF79BDF0D2B9"
                 + "&upvs=" + UPVS;
         // ★ 接单接口需要完整协议头（含 Host），与回单保持一致，
         //   仅用 s.authHeader 在后台时可能因缺少 Host 被服务器拒绝 ★
