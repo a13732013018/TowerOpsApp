@@ -139,26 +139,8 @@ public class WorkerTask implements Runnable {
             postUi(rowIndex, billsn, "准备接单[" + timeDiff2 + "≥" + 阈值接单 + "min]...");
             NET_LOCK.lock();
             try {
-                // ★ 接单前先查一次工单详情，获取最新 taskId ★
-                // 原因：未接单工单列表里的 taskid 字段服务器返回空，
-                //       但接单接口需要 taskId，必须从详情页拿
-                postUi(rowIndex, billsn, "阅读工单详情中...");
-                sleep(randInt(2000, 4000));
-                String detailForAccept = WorkOrderApi.getBillDetail(billsn);
-                try {
-                    JSONObject dj = new JSONObject(detailForAccept);
-                    // 优先 taskId（大小写兼容），其次 taskid
-                    String newTid = dj.optJSONObject("model") != null
-                            ? dj.getJSONObject("model").optString("taskId", "") : "";
-                    if (newTid.isEmpty()) {
-                        newTid = dj.optJSONObject("model") != null
-                                ? dj.getJSONObject("model").optString("taskid", "") : "";
-                    }
-                    if (!newTid.isEmpty() && !"null".equalsIgnoreCase(newTid)) {
-                        taskId = newTid;
-                    }
-                } catch (Exception ignored) {}
-
+                // ★ taskId 已在 MonitorTask 从列表字段直接取，无需再请求详情页 ★
+                //   若列表中 taskid 为空（服务器未返回），则传空字符串，服务器仍可接单
                 postUi(rowIndex, billsn, "点击接单(billId=" + billid + " taskId=" + taskId + ")...");
                 sleep(randInt(1000, 2000));
 
