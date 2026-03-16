@@ -235,23 +235,37 @@ public class WorkerTask implements Runnable {
 
         // ════════════════════════════════════════════════════════════
         // 场景三：自动回单
-        // [BUG-14 修复] alertStatus="未知" 时补请求一次确认
+        // [BUG-14/BUG-NEW 修复] alertStatus 必须确认为"已恢复"才可回单
+        // "未知"时补请求；请求失败/仍未知 → 拒绝回单，绝不误操作
         // ════════════════════════════════════════════════════════════
         if (enable回单 && acceptOperator.equals(s.username)) {
 
-            // 补充获取告警状态
-            if ("未知".equals(alertStatus) && !billsn.isEmpty()) {
-                try {
-                    String alarmStr = WorkOrderApi.getBillAlarmList(billsn);
-                    alertStatus = parseAlertStatus(alarmStr);
-                } catch (Exception ignored) {
-                    alertStatus = "未知";
+            // 补充获取告警状态（不论是"未知"还是初始值都要重新确认）
+            if (!"已恢复".equals(alertStatus) && !"告警中".equals(alertStatus)) {
+                // 状态不明确，必须补查一次
+                if (!billsn.isEmpty()) {
+                    try {
+                        postUi(rowIndex, billsn, "查询告警状态...");
+                        String alarmStr = WorkOrderApi.getBillAlarmList(billsn);
+                        String parsed = parseAlertStatus(alarmStr);
+                        postUi(rowIndex, billsn, "告警状态：" + parsed);
+                        alertStatus = parsed;
+                    } catch (Exception e) {
+                        alertStatus = "未知";
+                        postUi(rowIndex, billsn, "告警状态查询失败，跳过回单");
+                    }
                 }
             }
 
             if ("已恢复".equals(alertStatus)) {
                 hasAction = true;
                 doRevert(rowIndex, billsn, billtitle, billid, taskId, lock);
+            } else if ("告警中".equals(alertStatus)) {
+                // 明确告警中，不回单
+                postUi(rowIndex, billsn, "⚡告警中，不回单");
+            } else {
+                // 未知/查询失败，不回单，保守处理
+                postUi(rowIndex, billsn, "告警状态未知，暂不回单");
             }
         }
 
@@ -387,16 +401,58 @@ public class WorkerTask implements Runnable {
         return "";
     }
 
+    /**
+     * 解析告警状态
+     *
+     * 修复前的 Bug：
+     *  1. alarmStr 为 null/空（网络请求失败/超时）→ 直接返回"已恢复"，导致误回单
+     *  2. list 字段名不匹配（如服务器返回 data/alarms 等字段）→ list==null → 返回"已恢复"
+     *  3. JSON 解析异常 → 倾向于返回"已恢复"，没有任何保护
+     *
+     * 修复后规则（保守策略）：
+     *  - 空响应/请求失败       → "未知"（不操作）
+     *  - 响应非 JSON/解析失败  → 含 alarmname 关键字 → "告警中"；否则 → "未知"
+     *  - JSON 解析成功：
+     *      · 找到任意列表字段且长度 > 0  → "告警中"
+     *      · 找到列表字段且长度 == 0      → "已恢复"（服务器明确告知无告警）
+     *      · 未找到任何列表字段           → "未知"（字段结构未知，不冒险）
+     */
     private static String parseAlertStatus(String alarmStr) {
-        if (alarmStr == null || alarmStr.isEmpty()) return "已恢复";
+        // 空响应 = 网络失败，不能误判为已恢复
+        if (alarmStr == null || alarmStr.trim().isEmpty()) return "未知";
+
         try {
             JSONObject root = new JSONObject(alarmStr);
-            JSONArray list  = root.optJSONArray("alarmList");
+
+            // 兼容多种服务器返回字段名
+            JSONArray list = root.optJSONArray("alarmList");
             if (list == null) list = root.optJSONArray("list");
-            if (list == null || list.length() == 0) return "已恢复";
-            return "告警中";
+            if (list == null) list = root.optJSONArray("data");
+            if (list == null) list = root.optJSONArray("alarms");
+            if (list == null) list = root.optJSONArray("records");
+
+            if (list == null) {
+                // 未找到任何列表字段，结构未知，保守返回"未知"
+                // 但如果顶层就直接是状态字段，尝试读取
+                String status = root.optString("status", "");
+                if ("OK".equalsIgnoreCase(status) || "success".equalsIgnoreCase(status)) {
+                    // 服务器明确返回成功但没有列表，说明无告警
+                    return "已恢复";
+                }
+                return "未知";
+            }
+
+            // 有列表：list.length() > 0 = 告警中，== 0 = 已恢复
+            return list.length() > 0 ? "告警中" : "已恢复";
+
         } catch (Exception e) {
-            return alarmStr.contains("alarmname") ? "告警中" : "已恢复";
+            // JSON 解析失败，降级为关键字匹配
+            if (alarmStr.contains("alarmname") || alarmStr.contains("alarmName")
+                    || alarmStr.contains("alarm_name")) {
+                return "告警中";
+            }
+            // 解析失败且无告警关键字 → 不确定，返回未知
+            return "未知";
         }
     }
 
