@@ -126,13 +126,11 @@ public class MonitorTask implements Runnable {
                     }
                 }
 
-                // ── 接单人兜底：若actionList里没有ACCEPT，尝试工单顶层字段 ──
-                if (wo.acceptOperator.isEmpty()) {
-                    String op = item.optString("accept_user_name", "").trim();
-                    if (op.isEmpty()) op = item.optString("acceptUserName", "").trim();
-                    if (op.isEmpty()) op = item.optString("acceptOperator", "").trim();
-                    if (!op.isEmpty()) wo.acceptOperator = op;
-                }
+                // ── 接单人说明 ──────────────────────────────────────────────
+                // 只从 actionList 里的 ACCEPT 记录读取接单人（见上方循环）。
+                // ★ 绝对不能从工单顶层字段（accept_user_name 等）读取：
+                //   顶层字段存的是【派单人/指派人】而非接单人，未接单工单也会有值，
+                //   若从顶层读取会导致 acceptOperator 非空 → notAccepted=false → 永远不触发接单 ★
 
                 // 告警状态 + 解析最早告警时间
                 String alarmStr = WorkOrderApi.getBillAlarmList(wo.billsn);
