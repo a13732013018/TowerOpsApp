@@ -4,25 +4,25 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="#1e1e3a"
-    android:padding="6dp"
+    android:padding="10dp"
     android:layout_marginStart="4dp"
     android:layout_marginEnd="4dp"
-    android:layout_marginTop="2dp">
+    android:layout_marginTop="3dp">
 
     <!-- 第一行：序号 + 工单号 + 告警状态 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginBottom="2dp">
+        android:layout_marginBottom="4dp">
 
         <TextView
             android:id="@+id/tvIndex"
-            android:layout_width="24dp"
+            android:layout_width="28dp"
             android:layout_height="wrap_content"
             android:text="1"
             android:textColor="#606080"
-            android:textSize="11sp" />
+            android:textSize="12sp" />
 
         <TextView
             android:id="@+id/tvBillSn"
@@ -31,7 +31,7 @@
             android:layout_weight="1"
             android:text="工单号"
             android:textColor="#e94560"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
         <TextView
@@ -40,10 +40,10 @@
             android:layout_height="wrap_content"
             android:text="告警中"
             android:textColor="#ff6b35"
-            android:textSize="11sp"
+            android:textSize="12sp"
             android:background="@drawable/bg_tag"
-            android:paddingStart="5dp"
-            android:paddingEnd="5dp" />
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp" />
     </LinearLayout>
 
     <!-- 第二行：站点 + 标题 -->
@@ -53,8 +53,8 @@
         android:layout_height="wrap_content"
         android:text="站点名 - 工单标题"
         android:textColor="#c0c0e0"
-        android:textSize="12sp"
-        android:layout_marginBottom="2dp"
+        android:textSize="13sp"
+        android:layout_marginBottom="4dp"
         android:maxLines="2"
         android:ellipsize="end" />
 
@@ -63,7 +63,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginBottom="1dp">
+        android:layout_marginBottom="3dp">
 
         <TextView
             android:id="@+id/tvAcceptOp"
@@ -72,7 +72,7 @@
             android:layout_weight="1"
             android:text="接单人：-"
             android:textColor="#7070a0"
-            android:textSize="11sp" />
+            android:textSize="12sp" />
 
         <TextView
             android:id="@+id/tvCreateTime"
@@ -80,7 +80,7 @@
             android:layout_height="wrap_content"
             android:text="创建：-"
             android:textColor="#7070a0"
-            android:textSize="11sp" />
+            android:textSize="12sp" />
     </LinearLayout>
 
     <!-- 第四行：最近处理信息 -->
@@ -90,8 +90,8 @@
         android:layout_height="wrap_content"
         android:text=""
         android:textColor="#50a050"
-        android:textSize="11sp"
-        android:layout_marginBottom="1dp"
+        android:textSize="12sp"
+        android:layout_marginBottom="3dp"
         android:maxLines="1"
         android:ellipsize="end" />
 
@@ -102,8 +102,8 @@
         android:layout_height="wrap_content"
         android:text="工单历时：0分钟"
         android:textColor="#7090c0"
-        android:textSize="11sp"
-        android:layout_marginBottom="1dp" />
+        android:textSize="12sp"
+        android:layout_marginBottom="3dp" />
 
     <!-- 第六行：上次反馈时间 -->
     <TextView
@@ -112,8 +112,8 @@
         android:layout_height="wrap_content"
         android:text="上次反馈：尚未反馈"
         android:textColor="#9090c0"
-        android:textSize="11sp"
-        android:layout_marginBottom="1dp" />
+        android:textSize="12sp"
+        android:layout_marginBottom="3dp" />
 
     <!-- 第七行：告警发生时间 -->
     <TextView
@@ -122,8 +122,8 @@
         android:layout_height="wrap_content"
         android:text=""
         android:textColor="#a06030"
-        android:textSize="11sp"
-        android:layout_marginBottom="1dp" />
+        android:textSize="12sp"
+        android:layout_marginBottom="3dp" />
 
     <!-- 第八行：当前状态 -->
     <TextView
@@ -132,6 +132,6 @@
         android:layout_height="wrap_content"
         android:text="--排队等待处理中..."
         android:textColor="#e0c060"
-        android:textSize="11sp" />
+        android:textSize="12sp" />
 
 </LinearLayout>
