@@ -108,8 +108,8 @@ public class WorkerTask implements Runnable {
                 sleep(randInt(5000, 10000));
 
                 String comment = (billtitle.contains("停电") || billtitle.contains("断电"))
-                        ? "故障停电，联系电力部门处理中"
-                        : "站点设备故障，正在处理中";
+                        ? "故障停电"
+                        : "站点设备故障";
                 String remarkResult = WorkOrderApi.addRemark(taskId, comment, billsn);
 
                 if (remarkResult.contains("OK") || remarkResult.contains("success")) {
