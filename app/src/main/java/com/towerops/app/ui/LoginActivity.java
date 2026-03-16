@@ -164,6 +164,9 @@ public class LoginActivity extends AppCompatActivity {
                     s.token       = r.token;
                     s.mobilephone = r.mobilephone;
                     s.username    = r.username;
+                    // [BUG-FIX] realname = 账号对应的中文真实姓名（AccountConfig 第三列）
+                    // 用于后台接单/回单时匹配工单里的 acceptOperator（中文姓名）
+                    s.realname    = AccountConfig.getRealname(idx);
                     s.authHeader  = "Authorization: " + r.token + "\n"
                             + "equiptoken: \n"
                             + "appVer: 202112\n"
