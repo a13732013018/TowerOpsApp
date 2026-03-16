@@ -190,8 +190,11 @@ public class MonitorTask implements Runnable {
         s.resetProgress(count);
 
         // ---- 5. 派发工作线程 ----
+        // ★ 必须对 callback 做 null 检查：APP 退到后台时 callback==null，
+        //   若直接调用会在 Handler Runnable 里抛 NPE，虽不影响 NET_LOCK 释放，
+        //   但会导致后续所有 postUi 静默失败，接单状态无法更新到 UI ★
         WorkerTask.UiCallback uiCb = (rowIndex, billsn, content) ->
-                mainHandler.post(() -> callback.onStatusUpdate(rowIndex, billsn, content));
+                mainHandler.post(() -> { if (callback != null) callback.onStatusUpdate(rowIndex, billsn, content); });
 
         for (int i = 1; i <= count; i++) {
             final int idx = i;
@@ -216,7 +219,16 @@ public class MonitorTask implements Runnable {
     }
 
     /**
-     * 智能时间段控制：北京时间 02:00 ~ 05:59 夜间停止；06:00 ~ 次日 01:59 正常执行。
+     * 智能时间段控制（完全对应原易语言逻辑）：
+     *
+     * 原代码含义：
+     *   if (1 < hour && hour < 6)  → hour == 2,3,4,5  → 关闭自动接单、自动反馈
+     *   if (5 < hour && hour < 24) → hour == 6..23    → 开启自动接单、自动反馈
+     *
+     * 即：北京时间 02:00 ~ 05:59 夜间停止；06:00 ~ 次日 01:59 正常执行。
+     *
+     * 注意：每轮执行完都会重新判断，所以 06:00 后下一轮自动恢复。
+     * 回单（cbRevert）不受时段控制，用户手动设置保持不变。
      */
     private void applyTimeSchedule() {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
@@ -225,16 +237,20 @@ public class MonitorTask implements Runnable {
         String[] parts = s.appConfig.split("\u0001", -1);
         if (parts.length < 3) return;
 
-        boolean nightMode = (hour > 1 && hour < 6);
-        boolean dayMode   = (hour > 5 && hour < 24);
+        boolean nightMode = (hour > 1 && hour < 6); // 2,3,4,5 点 → 夜间
+        boolean dayMode   = (hour > 5 && hour < 24); // 6~23 点 → 白天/傍晚
 
         if (nightMode) {
+            // 夜间：关闭自动反馈 + 自动接单，回单不动
             parts[0] = "false";
             parts[1] = "false";
         } else if (dayMode) {
+            // 白天（含 0、1 点不在上面两个区间，保持用户设置不变；
+            //        6~23 点恢复开启，与原逻辑一致）
             parts[0] = "true";
             parts[1] = "true";
         }
+        // hour == 0 或 1：两个条件都不满足，不修改用户配置（与原逻辑一致）
 
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < parts.length; i++) {
