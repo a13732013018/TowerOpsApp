@@ -70,10 +70,10 @@ public class WorkerTask implements Runnable {
         String[] r1 = cfg[3].split("\\|");
         String[] r2 = cfg[4].split("\\|");
 
-        int min反馈 = parseInt(r1.length > 0 ? r1[0] : "30");
-        int max反馈 = parseInt(r1.length > 1 ? r1[1] : "60");
-        int min接单 = parseInt(r2.length > 0 ? r2[0] : "5");
-        int max接单 = parseInt(r2.length > 1 ? r2[1] : "15");
+        int min反馈 = parseInt(r1.length > 0 ? r1[0] : "70");
+        int max反馈 = parseInt(r1.length > 1 ? r1[1] : "90");
+        int min接单 = parseInt(r2.length > 0 ? r2[0] : "60");
+        int max接单 = parseInt(r2.length > 1 ? r2[1] : "90");
 
         int 阈值反馈 = randInt(min反馈, max反馈);
         int 阈值接单 = randInt(min接单, max接单);
@@ -113,9 +113,11 @@ public class WorkerTask implements Runnable {
         }
 
         // ==================== 场景二：自动接单 ====================
-        // 条件：未接单（acceptOperator为空）+ 距创建时间 >= 阈值分钟
+        // 条件：未接单（acceptOperator为空）+ billId非空 + 距创建时间 >= 阈值分钟
+        // 注意：接单只需要 billId + billSn，taskId 为空也可接单，不做 taskId 判断
         if (enable接单
                 && acceptOperator.isEmpty()
+                && !billid.isEmpty()
                 && timeDiff2 >= 阈值接单) {
 
             hasAction = true;
