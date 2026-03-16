@@ -77,8 +77,9 @@ public class MonitorService extends Service {
 
     // ── 状态 ───────────────────────────────────────────────────────────────
     private volatile boolean  taskRunning  = false;
+    private volatile long     taskStartAt  = 0;           // 当前任务开始时间（毫秒），用于超时检测
+    private static final long TASK_TIMEOUT_MS = 6 * 60 * 1000L; // 任务超时 6 分钟
     private final Handler     mainHandler  = new Handler(Looper.getMainLooper());
-    private final ExecutorService pool     = Executors.newCachedThreadPool();
     private final Random      random       = new Random();
 
     private PowerManager.WakeLock wakeLock;
@@ -89,11 +90,22 @@ public class MonitorService extends Service {
     private final Runnable heartbeat = new Runnable() {
         @Override
         public void run() {
-            if (isRunning() && !taskRunning) {
-                long nextAt = prefs.getLong(PREF_NEXT_RUN_AT, 0);
-                if (System.currentTimeMillis() >= nextAt) {
-                    // 超时未触发（Alarm 被吞），心跳兜底启动
-                    runOnce();
+            if (isRunning()) {
+                // ★ 超时看门狗：任务运行超过 6 分钟，强制重置 taskRunning，
+                //   防止 WorkerTask 异常/网络卡死导致 taskRunning 永久为 true（假死）★
+                if (taskRunning && taskStartAt > 0
+                        && System.currentTimeMillis() - taskStartAt > TASK_TIMEOUT_MS) {
+                    taskRunning = false;
+                    taskStartAt = 0;
+                    updateNotification("任务超时，已重置，等待下次轮询...");
+                }
+
+                if (!taskRunning) {
+                    long nextAt = prefs.getLong(PREF_NEXT_RUN_AT, 0);
+                    if (System.currentTimeMillis() >= nextAt) {
+                        // 超时未触发（Alarm 被吞），心跳兜底启动
+                        runOnce();
+                    }
                 }
             }
             // 只要服务存在就持续心跳
@@ -129,6 +141,10 @@ public class MonitorService extends Service {
             wakeLock.acquire(WAKELOCK_TIMEOUT_MS);
         }
 
+        // ★ 关键：服务重建时 Session.appConfig 会丢失（内存变量重置为""），
+        //   必须从 SharedPreferences 恢复，否则 WorkerTask 因 cfg.length<5 直接 return ★
+        Session.get().loadConfig(this);
+
         // ★ 关键修复：不再依赖内存 monitorOn，直接读 prefs 判断是否应该运行 ★
         boolean shouldRun = prefs.getBoolean(PREF_RUNNING, false);
 
@@ -152,7 +168,6 @@ public class MonitorService extends Service {
         super.onDestroy();
         mainHandler.removeCallbacks(heartbeat);
         cancelAlarm();
-        pool.shutdownNow();
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
     }
 
@@ -206,13 +221,17 @@ public class MonitorService extends Service {
         if (!isRunning()) return;          // 双重检查
         if (taskRunning) return;           // 防重入
         taskRunning = true;
+        taskStartAt = System.currentTimeMillis(); // ★ 记录任务开始时间，供超时看门狗使用 ★
 
         if (!wakeLock.isHeld()) {
             wakeLock.acquire(WAKELOCK_TIMEOUT_MS);
         }
         AlarmReceiver.releaseWakeLock();
 
-        pool.execute(new MonitorTask(new MonitorTask.MonitorCallback() {
+        // ★ 每轮新建独立线程执行 MonitorTask（MonitorTask 内部自己管理线程池）★
+        // 不再复用 pool，避免 pool.shutdown() 后 execute() 抛 RejectedExecutionException
+        ExecutorService taskRunner = Executors.newSingleThreadExecutor();
+        taskRunner.execute(new MonitorTask(new MonitorTask.MonitorCallback() {
             @Override
             public void onOrdersReady(List<WorkOrder> orders) {
                 updateNotification("处理中：共 " + orders.size() + " 条工单");
@@ -228,10 +247,10 @@ public class MonitorService extends Service {
             public void onAllDone() {
                 int done  = Session.get().getFinished();
                 int total = Session.get().getTotal();
-                // ★ callback 可能为 null（APP 在后台），但任务完成必须继续调度 ★
                 if (callback != null) callback.onAllDone(done, total);
                 taskRunning = false;
-                // 无条件安排下一轮（不判断 monitorOn 内存变量）
+                taskStartAt = 0;
+                taskRunner.shutdown(); // 释放本轮线程
                 if (isRunning()) scheduleNextRun();
             }
 
@@ -240,10 +259,12 @@ public class MonitorService extends Service {
                 updateNotification("错误：" + msg);
                 if (callback != null) callback.onError(msg);
                 taskRunning = false;
-                // 出错也继续调度，不能停
+                taskStartAt = 0;
+                taskRunner.shutdown();
                 if (isRunning()) scheduleNextRun();
             }
         }));
+        taskRunner.shutdown(); // 允许任务完成后自动退出，不阻塞
     }
 
     /**
