@@ -1,4 +1,3 @@
-
 package com.towerops.app.api;
 
 import com.towerops.app.model.Session;
@@ -91,16 +90,20 @@ public class WorkOrderApi {
     // =====================================================================
     // 5. 自动接单
     // =====================================================================
+    /**
+     * 接单请求。
+     * billStatus=0 表示"当前工单未接单"，是触发接单动作的正确值，
+     * 与原易语言 billStatus=0 完全一致。（传1=已接单，服务器会认为无需操作而忽略）
+     */
     public static String acceptBill(String billId, String billSn, String taskId) {
         Session s   = Session.get();
         String ts   = TimeUtil.getCurrentTimestamp();
         String url  = BASE + "?porttype=SET_BILL_ACCEPT&v=1.0.93&userid=" + s.userid + "&c=0";
-        // billStatus=1 表示接单成功（原来错误地传了0=未接单）
         String post = "userID="     + s.userid
                 + "&billId="        + billId
                 + "&billSn="        + billSn
                 + "&taskId="        + taskId
-                + "&billStatus=1"
+                + "&billStatus=0"
                 + "&faultCouse=%E6%89%8B%E6%9C%BA%E6%8E%A5%E5%8D%95"
                 + "&handlerResult=%E6%89%8B%E6%9C%BA%E6%8E%A5%E5%8D%95"
                 + "&c_timestamp="   + ts
