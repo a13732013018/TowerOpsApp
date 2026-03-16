@@ -108,8 +108,8 @@ public class WorkerTask implements Runnable {
                 sleep(randInt(5000, 10000));
 
                 String comment = (billtitle.contains("停电") || billtitle.contains("断电"))
-                        ? "故障停电"
-                        : "站点设备故障";
+                        ? "故障停电，联系电力部门处理中"
+                        : "站点设备故障，正在处理中";
                 String remarkResult = WorkOrderApi.addRemark(taskId, comment, billsn);
 
                 if (remarkResult.contains("OK") || remarkResult.contains("success")) {
@@ -123,28 +123,46 @@ public class WorkerTask implements Runnable {
         }
 
         // ==================== 场景二：自动接单 ====================
-        // 条件：未接单（acceptOperator为空/null）+ billId非空 + 距创建时间 >= 阈值分钟
-        // 注意：接单只需要 billId + billSn，taskId 为空也可接单
-        // 修复：服务器有时返回"null"字符串，需过滤掉
+        // 对照易语言原代码：选2状态=真 且 acceptOperator="" 且 timeDiff2>随机阈值接单
+        // ★ notAccepted 判断：acceptOperator 为空/null字符串/"-" 均视为未接单
+        //   不从顶层字段读取（已在 MonitorTask 修复），这里只做最终防御 ★
         boolean notAccepted = acceptOperator.isEmpty()
                 || "null".equalsIgnoreCase(acceptOperator)
                 || "-".equals(acceptOperator);
-        if (enable接单
-                && notAccepted
-                && !billid.isEmpty()
-                && !"null".equalsIgnoreCase(billid)
-                && timeDiff2 >= 阈值接单) {
+
+        // billid 必须有效（非空非"null"字符串）
+        boolean billIdValid = !billid.isEmpty() && !"null".equalsIgnoreCase(billid);
+
+        if (enable接单 && notAccepted && billIdValid && timeDiff2 >= 阈值接单) {
 
             hasAction = true;
             postUi(rowIndex, billsn, "准备接单[" + timeDiff2 + "≥" + 阈值接单 + "min]...");
             NET_LOCK.lock();
             try {
+                // ★ 接单前先查一次工单详情，获取最新 taskId ★
+                // 原因：未接单工单列表里的 taskid 字段服务器返回空，
+                //       但接单接口需要 taskId，必须从详情页拿
                 postUi(rowIndex, billsn, "阅读工单详情中...");
                 sleep(randInt(2000, 4000));
-                postUi(rowIndex, billsn, "点击接单...");
+                String detailForAccept = WorkOrderApi.getBillDetail(billsn);
+                try {
+                    JSONObject dj = new JSONObject(detailForAccept);
+                    // 优先 taskId（大小写兼容），其次 taskid
+                    String newTid = dj.optJSONObject("model") != null
+                            ? dj.getJSONObject("model").optString("taskId", "") : "";
+                    if (newTid.isEmpty()) {
+                        newTid = dj.optJSONObject("model") != null
+                                ? dj.getJSONObject("model").optString("taskid", "") : "";
+                    }
+                    if (!newTid.isEmpty() && !"null".equalsIgnoreCase(newTid)) {
+                        taskId = newTid;
+                    }
+                } catch (Exception ignored) {}
+
+                postUi(rowIndex, billsn, "点击接单(billId=" + billid + " taskId=" + taskId + ")...");
                 sleep(randInt(1000, 2000));
 
-                // ★ 接单最多重试2次：前后台均有效，不依赖 UI 回调 ★
+                // ★ 接单最多重试2次，前后台均有效，不依赖 UI 回调 ★
                 String acceptResult = "";
                 boolean acceptOk = false;
                 for (int attempt = 1; attempt <= 2; attempt++) {
@@ -156,14 +174,13 @@ public class WorkerTask implements Runnable {
                         acceptOk = true;
                         break;
                     }
-                    // 若返回"已接单"说明已经接过，当作成功处理
+                    // 若返回"已接单"/"重复"，说明已经接过，当作成功处理
                     if (acceptResult.contains("已接单") || acceptResult.contains("重复")) {
                         acceptOk = true;
                         break;
                     }
                     if (attempt < 2) {
-                        // 第一次失败后等待 3~5 秒再重试
-                        postUi(rowIndex, billsn, "接单第" + attempt + "次失败，重试...");
+                        postUi(rowIndex, billsn, "接单第" + attempt + "次未成功，重试...");
                         sleep(randInt(3000, 5000));
                     }
                 }
@@ -171,9 +188,9 @@ public class WorkerTask implements Runnable {
                 if (acceptOk) {
                     postUi(rowIndex, billsn, "接单成功 ✓");
                 } else {
-                    // 输出完整返回值（最多80字符）便于排查服务器拒绝原因
+                    // 输出完整返回值（最多100字符）便于排查服务器拒绝原因
                     String brief = acceptResult.replaceAll("[\\r\\n]", " ");
-                    postUi(rowIndex, billsn, "接单失败:" + brief.substring(0, Math.min(80, brief.length())));
+                    postUi(rowIndex, billsn, "接单失败:" + brief.substring(0, Math.min(100, brief.length())));
                 }
             } finally {
                 NET_LOCK.unlock();
