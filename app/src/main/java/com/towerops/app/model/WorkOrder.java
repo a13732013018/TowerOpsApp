@@ -17,6 +17,7 @@ public class WorkOrder {
     public int    timeDiff1;       // 最近操作至今分钟数（或创建至今）
     public String acceptOperator;  // 接单人
     public String statusCol;       // 第12列状态显示（动态刷新）
+    public String alertTime;       // 最早告警发生时间（从告警列表解析）
 
     public String billid;
     public String taskId;
