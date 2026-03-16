@@ -22,7 +22,10 @@ import com.towerops.app.model.Session;
 import com.towerops.app.model.WorkOrder;
 import com.towerops.app.worker.MonitorService;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -72,7 +75,8 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onAllDone(int done, int total) {
             syncConfigFromSession();
-            tvProgress.setText("本轮完成：" + done + "/" + total + " 条");
+            String time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
+            tvProgress.setText("本轮完成 " + done + "/" + total + " 条  " + time);
         }
 
         @Override
@@ -156,8 +160,8 @@ public class MainActivity extends AppCompatActivity {
         }
         buildConfig();
         monitorService.setInterval(
-                parseInt(etIntMin.getText().toString(), 30),
-                parseInt(etIntMax.getText().toString(), 60));
+                parseInt(etIntMin.getText().toString(), 90),
+                parseInt(etIntMax.getText().toString(), 120));
         monitorService.startMonitor();
         syncButtonState();
         tvProgress.setText("监控已启动");
@@ -225,10 +229,10 @@ public class MainActivity extends AppCompatActivity {
         String fbMaxStr  = etFbMax.getText().toString().trim();
         String accMinStr = etAccMin.getText().toString().trim();
         String accMaxStr = etAccMax.getText().toString().trim();
-        if (fbMinStr.isEmpty())  fbMinStr  = "30";
-        if (fbMaxStr.isEmpty())  fbMaxStr  = "60";
-        if (accMinStr.isEmpty()) accMinStr = "3";
-        if (accMaxStr.isEmpty()) accMaxStr = "8";
+        if (fbMinStr.isEmpty())  fbMinStr  = "70";
+        if (fbMaxStr.isEmpty())  fbMaxStr  = "90";
+        if (accMinStr.isEmpty()) accMinStr = "60";
+        if (accMaxStr.isEmpty()) accMaxStr = "90";
         s.appConfig = fb + "\u0001" + acc + "\u0001" + rev + "\u0001"
                 + fbMinStr + "|" + fbMaxStr + "\u0001"
                 + accMinStr + "|" + accMaxStr;
