@@ -259,6 +259,67 @@
             android:textSize="11sp"/>
     </LinearLayout>
 
+    <!-- 排序工具栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:orientation="horizontal"
+        android:background="#0d0d20"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="排序："
+            android:textColor="#606080"
+            android:textSize="11sp"/>
+
+        <!-- 工单历时排序按钮（默认选中） -->
+        <TextView
+            android:id="@+id/btnSortBillTime"
+            android:layout_width="wrap_content"
+            android:layout_height="26dp"
+            android:text="工单历时 ↓"
+            android:textSize="11sp"
+            android:textColor="#ffffff"
+            android:background="@drawable/bg_tag"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:gravity="center"
+            android:layout_marginStart="6dp"
+            android:clickable="true"
+            android:focusable="true"/>
+
+        <!-- 反馈历时排序按钮（点击在大→小/小→大之间切换） -->
+        <TextView
+            android:id="@+id/btnSortFeedbackTime"
+            android:layout_width="wrap_content"
+            android:layout_height="26dp"
+            android:text="反馈历时 ↕"
+            android:textSize="11sp"
+            android:textColor="#a0a0c0"
+            android:background="@drawable/bg_tag"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:gravity="center"
+            android:layout_marginStart="8dp"
+            android:clickable="true"
+            android:focusable="true"/>
+
+        <TextView
+            android:id="@+id/tvSortDesc"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="工单历时 大→小"
+            android:textColor="#404060"
+            android:textSize="10sp"
+            android:layout_marginStart="10dp"/>
+
+    </LinearLayout>
+
     <!-- 工单列表 -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerOrders"
