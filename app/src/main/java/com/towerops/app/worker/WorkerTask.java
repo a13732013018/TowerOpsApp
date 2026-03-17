@@ -64,8 +64,13 @@ public class WorkerTask implements Runnable {
      */
     private static final ReentrantLock  OP_SEQUENCE_LOCK = new ReentrantLock(true);
     private static volatile long        lastOpTimeMs     = 0L;
-    /** 任意两次操作之间的最小间隔：5秒，保证服务器记录的时间戳至少差5秒 */
-    private static final long           MIN_OP_GAP_MS    = 5000L;
+    /**
+     * 任意两次操作之间的最小/最大间隔（毫秒）。
+     * 每次 acquireOpLock 时在此区间内随机等待，模拟真实人工操作节奏，
+     * 避免多工单批量操作时服务器日志出现等间距时间戳，降低被识别风险。
+     */
+    private static final long           MIN_OP_GAP_MS    = 8000L;   // 最少等8秒
+    private static final long           MAX_OP_GAP_MS    = 15000L;  // 最多等15秒
 
     static {
         LOCKS = new ReentrantLock[LOCK_SEGMENTS];
@@ -180,6 +185,7 @@ public class WorkerTask implements Runnable {
                 postUi(rowIndex, billsn, "接单：等待被中断，跳过");
             } else {
                 lock.lock();
+                boolean releasedEarly = false;
                 try {
                     postUi(rowIndex, billsn, "点击接单(billId=" + billid
                             + " taskId=" + taskId
@@ -189,22 +195,21 @@ public class WorkerTask implements Runnable {
 
                     String  acceptResult = "";
                     boolean acceptOk     = false;
-                    try {
-                        for (int attempt = 1; attempt <= 2; attempt++) {
-                            acceptResult = WorkOrderApi.acceptBill(billid, billsn, taskId);
-                            if (isSuccess(acceptResult)) { acceptOk = true; break; }
-                            if (acceptResult.contains("已接单") || acceptResult.contains("重复")) {
-                                acceptOk = true; break;
-                            }
-                            if (attempt < 2) {
-                                postUi(rowIndex, billsn, "接单第" + attempt + "次未成功，重试...");
-                                sleepMs(randInt(3000, 5000));
-                            }
+                    for (int attempt = 1; attempt <= 2; attempt++) {
+                        acceptResult = WorkOrderApi.acceptBill(billid, billsn, taskId);
+                        if (isSuccess(acceptResult)) { acceptOk = true; break; }
+                        if (acceptResult.contains("已接单") || acceptResult.contains("重复")) {
+                            acceptOk = true; break;
                         }
-                    } finally {
-                        lock.unlock();
-                        releaseOpLock(); // 先解分段锁，再释放时序锁
+                        if (attempt < 2) {
+                            postUi(rowIndex, billsn, "接单第" + attempt + "次未成功，重试...");
+                            sleepMs(randInt(3000, 5000));
+                        }
                     }
+                    // 先释放锁再更新 UI（减少持锁时间）
+                    lock.unlock();
+                    releaseOpLock();
+                    releasedEarly = true;
 
                     if (acceptOk) {
                         postUi(rowIndex, billsn, "接单成功 ✓");
@@ -213,10 +218,12 @@ public class WorkerTask implements Runnable {
                         String brief = acceptResult.replaceAll("[\\r\\n]+", " ").trim();
                         postUi(rowIndex, billsn, "接单失败，服务器响应: " + brief);
                     }
-                } catch (Exception e) {
-                    lock.unlock();
-                    releaseOpLock();
-                    throw e;
+                } finally {
+                    // 若上面提前释放过就跳过，防止双重释放
+                    if (!releasedEarly) {
+                        lock.unlock();
+                        releaseOpLock();
+                    }
                 }
             }
         }
@@ -250,6 +257,7 @@ public class WorkerTask implements Runnable {
                 postUi(rowIndex, billsn, "反馈：等待被中断，跳过");
             } else {
                 lock.lock();
+                boolean releasedEarly = false;
                 try {
                     postUi(rowIndex, billsn, "正在填写反馈内容...");
                     sleepMs(randInt(5000, 10000));
@@ -257,23 +265,21 @@ public class WorkerTask implements Runnable {
                     String comment = (billtitle.contains("停电") || billtitle.contains("断电"))
                             ? "故障停电"
                             : "站点设备故障";
-                    String remarkResult;
-                    try {
-                        remarkResult = WorkOrderApi.addRemark(taskId, comment, billsn);
-                    } finally {
-                        lock.unlock();
-                        releaseOpLock();
-                    }
+                    String remarkResult = WorkOrderApi.addRemark(taskId, comment, billsn);
+                    lock.unlock();
+                    releaseOpLock();
+                    releasedEarly = true;
 
                     if (isSuccess(remarkResult)) {
                         postUi(rowIndex, billsn, "反馈成功 ✓  [" + comment + "]");
                     } else {
                         postUi(rowIndex, billsn, "反馈完毕:" + brief(remarkResult, 60));
                     }
-                } catch (Exception e) {
-                    lock.unlock();
-                    releaseOpLock();
-                    throw e;
+                } finally {
+                    if (!releasedEarly) {
+                        lock.unlock();
+                        releaseOpLock();
+                    }
                 }
             }
         }
@@ -284,8 +290,14 @@ public class WorkerTask implements Runnable {
         //   永远不等，回单永远不触发。修复：改用 s.realname。
         // 告警状态已由 MonitorTask Step 2b 并发实时查询填充（告警中/已恢复），
         // 此处直接用，无需再补查。
+        // 额外安全校验：acceptOperator 必须非空非null，防止工单未接单时误触发回单
         // ════════════════════════════════════════════════════════════
-        if (enable回单 && !s.realname.isEmpty() && s.realname.equals(acceptOperator)) {
+        boolean isMyOrder = !s.realname.isEmpty()
+                && !acceptOperator.isEmpty()
+                && !"null".equalsIgnoreCase(acceptOperator)
+                && s.realname.equals(acceptOperator);
+
+        if (enable回单 && isMyOrder) {
 
             if ("已恢复".equals(alertStatus)) {
                 hasAction = true;
@@ -522,14 +534,16 @@ public class WorkerTask implements Runnable {
     private static boolean acquireOpLock() {
         OP_SEQUENCE_LOCK.lock();
         if (Thread.currentThread().isInterrupted()) {
-            OP_SEQUENCE_LOCK.unlock(); // 被中断立即释放，不持有锁挂着
+            OP_SEQUENCE_LOCK.unlock();
             return false;
         }
-        long now  = System.currentTimeMillis();
-        long wait = MIN_OP_GAP_MS - (now - lastOpTimeMs);
+        long now     = System.currentTimeMillis();
+        // 每次随机一个等待间隔，模拟真实人工节奏
+        long randGap = MIN_OP_GAP_MS + (long)(Math.random() * (MAX_OP_GAP_MS - MIN_OP_GAP_MS));
+        long wait    = randGap - (now - lastOpTimeMs);
         if (wait > 0) {
             try {
-                Thread.sleep(wait); // 可中断 sleep
+                Thread.sleep(wait);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 OP_SEQUENCE_LOCK.unlock();
