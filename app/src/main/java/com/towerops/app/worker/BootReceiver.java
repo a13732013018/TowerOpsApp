@@ -18,11 +18,14 @@ public class BootReceiver extends BroadcastReceiver {
                 || "android.intent.action.QUICKBOOT_POWERON".equals(action)
                 || "com.htc.intent.action.QUICKBOOT_POWERON".equals(action)) {
 
+            // 检查上次是否是运行状态，且用户没有主动停止
             SharedPreferences prefs = context.getSharedPreferences(
                     MonitorService.PREF_NAME, Context.MODE_PRIVATE);
-            boolean wasRunning = prefs.getBoolean(MonitorService.PREF_RUNNING, false);
+            boolean wasRunning  = prefs.getBoolean(MonitorService.PREF_RUNNING,      false);
+            boolean userStopped = prefs.getBoolean(MonitorService.PREF_USER_STOPPED, true);
 
-            if (wasRunning) {
+            if (wasRunning && !userStopped) {
+                // 用户没有主动停止，开机后自动恢复轮询
                 MonitorService.startSelf(context);
             }
         }
