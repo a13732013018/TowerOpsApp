@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 渐变主色调 -->
+    <color name="gradient_start">#0f0c29</color>
+    <color name="gradient_center">#302b63</color>
+    <color name="gradient_end">#24243e</color>
+    
+    <!-- 按钮渐变 -->
+    <color name="button_start">#e94560</color>
+    <color name="button_end">#ff6b9d</color>
+    <color name="button_pressed_start">#d63855</color>
+    <color name="button_pressed_end">#e05a8d</color>
+    
+    <!-- 卡片背景 -->
+    <color name="card_bg">#3D1F42</color>
+    
+    <!-- 输入框背景 -->
+    <color name="input_bg">#261430</color>
+    <color name="input_bg_focused">#2D1940</color>
+    
+    <!-- 文字颜色 -->
+    <color name="text_white">#FFFFFF</color>
+    <color name="text_label_glass">#8080A0</color>
+    <color name="text_hint_glass">#606080</color>
+    
+    <!-- 状态颜色 -->
+    <color name="error_gradient">#e94560</color>
+    <color name="success_gradient">#40c080</color>
+</resources>
