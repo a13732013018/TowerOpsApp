@@ -82,11 +82,12 @@ public class LoginActivity extends AppCompatActivity {
         btnLogin          = findViewById(R.id.btnLogin);
         tvStatus          = findViewById(R.id.tvStatus);
 
-               // 设置账号下拉框
+                  // 设置账号下拉框（使用自定义样式，白色文字）
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item, AccountConfig.getDisplayNames());
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                R.layout.spinner_item_account, AccountConfig.getDisplayNames());
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_account);
         spinnerAccount.setAdapter(adapter);
+
 
         // 点击验证码容器，重新加载验证码
         flCaptcha.setOnClickListener(v -> loadCaptcha());
