@@ -1,5 +1,6 @@
 package com.towerops.app.worker;
 
+import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -220,6 +221,7 @@ public class MonitorService extends Service {
     public void stopMonitor() {
         prefs.edit().putBoolean(PREF_RUNNING, false).apply();
         mainHandler.removeCallbacks(timerRunnable);
+        cancelAlarm(); // 取消已排队的精确闹钟，防止停止后仍被唤醒
         taskRunning = false;
         taskStartAt = 0;
         safeReleaseWakeLock();
@@ -301,7 +303,12 @@ public class MonitorService extends Service {
     }
 
     /**
-     * [BUG-4 修复] WakeLock 在等待期间释放，timerRunnable 触发时 runOnce 入口重新 acquire。
+     * 调度下次轮询。
+     * 双保险策略：
+     *   1. AlarmManager 精确唤醒（WAKE_UP 类型）—— 息屏/Doze 模式下也能按时触发，
+     *      触发后由 AlarmReceiver 拉起服务并执行 runOnce()
+     *   2. mainHandler.postDelayed 兜底 —— App 在前台时 Handler 更及时，两者取先到的
+     * WakeLock 在等待期间释放省电，AlarmReceiver / timerRunnable 触发时 runOnce 入口重新 acquire。
      */
     private void scheduleNext(int delaySec) {
         long nextAt = System.currentTimeMillis() + delaySec * 1000L;
@@ -309,8 +316,53 @@ public class MonitorService extends Service {
         updateNotification("下次轮询：" + delaySec + "秒后");
         dispatchNextRun(delaySec);
         safeReleaseWakeLock(); // 等待期间释放，省电
+
+        // ── 方案1：AlarmManager 精确唤醒（息屏/Doze 下也能按时触发）──
+        scheduleAlarm(delaySec);
+
+        // ── 方案2：Handler 兜底（App 在前台时更及时）──
         mainHandler.removeCallbacks(timerRunnable);
         mainHandler.postDelayed(timerRunnable, delaySec * 1000L);
+    }
+
+    /** 设置 AlarmManager 精确唤醒闹钟，由 AlarmReceiver 触发服务重新 runOnce */
+    private void scheduleAlarm(int delaySec) {
+        AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        if (am == null) return;
+
+        Intent intent = new Intent(this, AlarmReceiver.class);
+        intent.setAction("com.towerops.app.ALARM_TRIGGER");
+        int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) piFlags |= PendingIntent.FLAG_IMMUTABLE;
+        PendingIntent pi = PendingIntent.getBroadcast(this, 0, intent, piFlags);
+
+        long triggerAt = System.currentTimeMillis() + delaySec * 1000L;
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                // setExactAndAllowWhileIdle：在 Doze 模式下也能精确触发
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi);
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                am.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pi);
+            } else {
+                am.set(AlarmManager.RTC_WAKEUP, triggerAt, pi);
+            }
+        } catch (Exception e) {
+            // 部分设备/ROM 可能抛异常，Handler 兜底会顶上
+            e.printStackTrace();
+        }
+    }
+
+    /** 取消已排队的 AlarmManager 闹钟（停止监控时调用） */
+    private void cancelAlarm() {
+        AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        if (am == null) return;
+        Intent intent = new Intent(this, AlarmReceiver.class);
+        intent.setAction("com.towerops.app.ALARM_TRIGGER");
+        int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) piFlags |= PendingIntent.FLAG_IMMUTABLE;
+        PendingIntent pi = PendingIntent.getBroadcast(this, 0, intent, piFlags);
+        am.cancel(pi);
     }
 
     private void dispatchNextRun(int delaySec) {
