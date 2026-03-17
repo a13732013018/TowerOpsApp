@@ -2,6 +2,7 @@ package com.towerops.app.worker;
 
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import com.towerops.app.api.WorkOrderApi;
 import com.towerops.app.model.Session;
@@ -12,6 +13,9 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -29,10 +33,10 @@ import java.util.concurrent.TimeUnit;
  * [BUG-7] getBillAlarmList 在解析循环里串行调用
  *   原代码：for (int i=0; i<count; i++) { ... getBillAlarmList(billsn) ... }
  *           N 条工单 = N 次串行网络请求，100条工单可能需要100×2s=200s，极易 ANR。
- *           更严重：告警信息在解析阶段（主控线程）同步获取，占用了 MonitorTask 的执行时间，
- *           导致 awaitTermination 超时、工单被批量丢弃。
- *   修复：告警信息移到 WorkerTask 里按需（回单场景才需要）并发获取，
- *         MonitorTask 只做本地 JSON 解析，默认 alertStatus="未知"。
+ *   修复：单独开一个并发查询阶段（Step 2b），最多10个线程同时查告警，
+ *         全部查完后再打包 taskPacks 派发工作线程。
+ *         告警状态仍然实时确认（"告警中"/"已恢复"），不使用任何默认值。
+ *         查询失败时保守处理为"告警中"（宁可不回单也不误回单）。
  *
  * [BUG-8] remaining AtomicInteger 只减不等
  *   原代码：remaining.decrementAndGet() 在 finally 里，但从未被 wait/检查，
@@ -95,20 +99,53 @@ public class MonitorTask implements Runnable {
             return;
         }
 
-        // ── Step 2：本地解析工单（不发网络请求）────────────────────────
-        List<WorkOrder> orders    = new ArrayList<>(count);
-        String[]        taskPacks = new String[count + 1]; // 1-based
-
+        // ── Step 2a：本地解析工单 JSON（纯内存操作，不发网络）──────────
+        List<WorkOrder> orders = new ArrayList<>(count);
         final JSONArray finalBillList = billList;
         for (int i = 0; i < count; i++) {
             try {
                 JSONObject item = finalBillList.getJSONObject(i);
                 WorkOrder wo = parseWorkOrder(item, i);
                 orders.add(wo);
-                taskPacks[i + 1] = packTask(wo, i);
             } catch (Exception e) {
                 e.printStackTrace();
             }
+        }
+
+        // ── Step 2b：并发查告警状态（只有两种结果：告警中 / 已恢复）─────
+        // 对应易语言：
+        //   如果 寻找文本(APP故障信息(billsn), "alarmname") ≠ -1 → 告警中
+        //   否则 → 已恢复
+        // 最多 10 线程并发，CountDownLatch 等全部完成（最多 2 分钟兜底）。
+        // 查询失败（网络异常/返回空）：保守处理为"告警中"，宁可不回单也不误回单。
+        int alarmThreads = Math.min(10, count);
+        ExecutorService alarmPool = Executors.newFixedThreadPool(alarmThreads);
+        CountDownLatch alarmLatch = new CountDownLatch(orders.size());
+        for (WorkOrder wo : orders) {
+            final WorkOrder finalWo = wo;
+            alarmPool.execute(() -> {
+                try {
+                    String resp = WorkOrderApi.getBillAlarmList(finalWo.billsn);
+                    // 严格按易语言逻辑：寻找文本(resp, "alarmname") ≠ -1 → 告警中
+                    finalWo.alertStatus = resp.contains("alarmname") ? "告警中" : "已恢复";
+                } catch (Exception e) {
+                    finalWo.alertStatus = "告警中"; // 查询异常保守处理
+                } finally {
+                    alarmLatch.countDown();
+                }
+            });
+        }
+        alarmPool.shutdown();
+        try {
+            alarmLatch.await(2, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // ── Step 2c：打包 taskPacks（告警状态已全部就绪）────────────────
+        String[] taskPacks = new String[count + 1]; // 1-based
+        for (int i = 0; i < orders.size(); i++) {
+            taskPacks[i + 1] = packTask(orders.get(i), i);
         }
 
         // ── Step 3：推送工单列表到 UI ────────────────────────────────────
@@ -132,10 +169,16 @@ public class MonitorTask implements Runnable {
             localPool.execute(() -> new WorkerTask(idx, uiCb).run());
         }
 
-        // ── Step 6：等待全部完成（最长7分钟兜底）────────────────────────
+        // ── Step 6：等待全部完成（动态超时）──────────────────────────────
+        // 超时计算：
+        //   告警查询已耗时最多2分钟（Step 2b 限时）
+        //   每条工单操作：OP_SEQUENCE_LOCK 间隔5秒 + 随机等待最多10秒 + 网络约5秒 ≈ 30秒
+        //   串行时序锁下 N 条工单最多耗时 N×30秒
+        //   最少保底 7 分钟，最多上限 45 分钟（与 MonitorService WATCHDOG_MS 对齐）
+        long dynamicTimeoutSec = Math.min(45 * 60L, Math.max(7 * 60L, 120L + (long) count * 30L));
         localPool.shutdown();
         try {
-            boolean finished = localPool.awaitTermination(7, TimeUnit.MINUTES);
+            boolean finished = localPool.awaitTermination(dynamicTimeoutSec, TimeUnit.SECONDS);
             if (!finished) localPool.shutdownNow();
         } catch (InterruptedException e) {
             localPool.shutdownNow();
@@ -217,11 +260,9 @@ public class MonitorTask implements Runnable {
             }
         }
 
-        // 告警状态：实时发 getBillAlarmList 请求确认
-        // 规则：响应里含 "alarmname" = 告警中；否则（空/列表为空/解析失败）= 已恢复
-        // 对应易语言：寻找文本(APP故障信息(billsn), "alarmname") ≠ -1 → 告警中
-        String alarmStr = WorkOrderApi.getBillAlarmList(wo.billsn);
-        wo.alertStatus = alarmStr.contains("alarmname") ? "告警中" : "已恢复";
+        // 告警状态初始保守值 = "告警中"
+        // Step 2b 并发查询后会覆盖为实际结果（"告警中" 或 "已恢复"），只有这两种值。
+        wo.alertStatus = "告警中";
 
         // 告警时间
         wo.alertTime = firstNonEmpty(
