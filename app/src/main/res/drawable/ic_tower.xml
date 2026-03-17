@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    
+    <!-- 铁塔图标 -->
+    <path
+        android:fillColor="#ffffff"
+        android:pathData="M12 2L4 7v10l8 5 8-5V7l-8-5zM12 4.5l6 3.75v8.5l-6 3.75-6-3.75v-8.5L12 4.5z" />
+    
+    <!-- 信号波纹 -->
+    <path
+        android:strokeColor="#ffffff"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M12 2L12 6" />
+    
+    <path
+        android:strokeColor="#ffffff"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M6 7L9 9" />
+    
+    <path
+        android:strokeColor="#ffffff"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M18 7L15 9" />
+    
+</vector>
