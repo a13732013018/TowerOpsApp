@@ -15,8 +15,4 @@
     <color name="text_primary_neu">#4a5568</color>
     <color name="text_secondary_neu">#718096</color>
     <color name="text_hint_neu">#a0aec0</color>
-    
-    <!-- 状态颜色 -->
-    <color name="error_neu">#fc8181</color>
-    <color name="success_neu">#68d391</color>
 </resources>
