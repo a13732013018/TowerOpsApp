@@ -4,14 +4,12 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
-import android.os.PowerManager;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -157,9 +155,6 @@ public class MainActivity extends AppCompatActivity {
         btnStop.setOnClickListener(v  -> stopMonitor());
         btnLogout.setOnClickListener(v -> doLogout());
 
-        // ★ 关键：引导用户关闭电池优化，这是后台保活的必要条件 ★
-        requestIgnoreBatteryOptimizations();
-
         Intent intent = new Intent(this, MonitorService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent);
@@ -224,9 +219,7 @@ public class MainActivity extends AppCompatActivity {
                 parseInt(etIntMax.getText().toString(), 120));
         monitorService.startMonitor();
         syncButtonState();
-        tvProgress.setText("监控已启动");
-        // ★ 每次开始监控时，提示用户开启厂商白名单（弹一次即可，用户记住后不再打扰）
-        goToVendorBatterySettings();
+        tvProgress.setText("等待首次执行...");
     }
 
     private void stopMonitor() {
@@ -489,31 +482,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // ── 后台保活：电池优化 + 厂商白名单 ─────────────────────────────────
-
-    /**
-     * 请求系统弹出"忽略电池优化"对话框。
-     * 这是对抗国产 ROM 后台杀进程的第一步，必须用户手动同意才生效。
-     * 仅在未授权时弹出，避免重复打扰。
-     */
-    private void requestIgnoreBatteryOptimizations() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
-        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-        String pkg = getPackageName();
-        if (pm != null && !pm.isIgnoringBatteryOptimizations(pkg)) {
-            try {
-                Intent intent = new Intent(
-                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                        Uri.parse("package:" + pkg));
-                startActivity(intent);
-            } catch (Exception e) {
-                // 部分 ROM 不支持直接跳转，降级到电池优化列表页
-                try {
-                    startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
-                } catch (Exception ignored) {}
-            }
-        }
-    }
+    // ── 后台保活：厂商白名单 ──────────────────────────────────────────────
 
     /**
      * 跳转到对应厂商的后台管理/自启动白名单设置页面。
