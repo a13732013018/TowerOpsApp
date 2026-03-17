@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp"
+        android:padding="8dp"
         android:gravity="center_horizontal">
 
         <!-- Logo 区域 -->
@@ -20,14 +20,14 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:gravity="center"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="16dp">
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="8dp">
 
             <!-- Logo 图标容器 -->
             <FrameLayout
                 android:layout_width="72dp"
                 android:layout_height="72dp"
-                android:layout_marginBottom="12dp">
+                android:layout_marginBottom="8dp">
 
                 <View
                     android:layout_width="match_parent"
@@ -71,8 +71,8 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/bg_card_glass"
-            android:padding="32dp"
-            android:layout_marginBottom="24dp">
+            android:padding="24dp"
+            android:layout_marginBottom="12dp">
 
             <!-- 账号选择 -->
             <TextView
@@ -245,7 +245,7 @@
             android:textStyle="bold"
             android:textColor="#404060"
             android:letterSpacing="0.08"
-            android:layout_marginBottom="32dp" />
+            android:layout_marginBottom="16dp" />
 
     </LinearLayout>
 
