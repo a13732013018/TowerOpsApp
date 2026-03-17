@@ -26,11 +26,28 @@
 
         <TextView
             android:id="@+id/tvUserInfo"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:text="未登录"
             android:textColor="#a0a0c0"
-            android:textSize="11sp"/>
+            android:textSize="11sp"
+            android:gravity="end"
+            android:layout_marginEnd="6dp"/>
+
+        <TextView
+            android:id="@+id/btnLogout"
+            android:layout_width="wrap_content"
+            android:layout_height="24dp"
+            android:text="退出"
+            android:textColor="#e94560"
+            android:textSize="11sp"
+            android:background="@drawable/bg_tag"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"/>
     </LinearLayout>
 
     <!-- 配置区 -->
