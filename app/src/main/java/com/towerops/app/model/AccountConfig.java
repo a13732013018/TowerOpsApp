@@ -24,7 +24,7 @@ public class AccountConfig {
      */
     public static final String[][] ACCOUNTS = {
             {"wx-linjy22",       "z0J1CVrRPjfQgO4jhLuJwg%3D%3D",  "林甲雨"},
-            {"wx-liujj6",        "MwAPfB0gVI3Ddfk%2BByiG3Q%3D%3D","王俊杰"},
+            {"wx-liujj6",        "MwAPfB0gVI3Ddfk%2BByiG3Q%3D%3D","刘娟娟"},
             {"wx-linyl",         "z0J1CVrRPjfQgO4jhLuJwg%3D%3D",  "林元龙"},
             {"wx-maoll5",        "z0J1CVrRPjfQgO4jhLuJwg%3D%3D",  "毛露露"},
             {"wx-wangjj96",      "uwhpKacQXX1aC3eyE9rkQg%3D%3D",  "王俊杰"},
