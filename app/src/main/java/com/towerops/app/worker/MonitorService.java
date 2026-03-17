@@ -72,8 +72,8 @@ public class MonitorService extends Service {
 
     private static final String CHANNEL_ID  = "tower_ops_monitor";
     private static final int    NOTIF_ID    = 1001;
-    private static final long   WAKELOCK_MS = 11 * 60 * 1000L; // 比任务超时多1分钟
-    private static final long   WATCHDOG_MS =  8 * 60 * 1000L; // 看门狗：8分钟超时重置
+    private static final long   WAKELOCK_MS = 47 * 60 * 1000L; // 比最大任务超时（45分钟）多2分钟
+    private static final long   WATCHDOG_MS = 46 * 60 * 1000L; // 看门狗：46分钟（与动态超时上限45分钟对齐）
 
     // ── Binder ─────────────────────────────────────────────────────────────
     public class LocalBinder extends Binder {
@@ -151,9 +151,13 @@ public class MonitorService extends Service {
         // 服务重建时恢复登录凭据和配置（START_STICKY 进程重建后内存清空，必须从 prefs 恢复）
         Session.get().loadConfig(this);
 
-        if (prefs.getBoolean(PREF_RUNNING, false) && !taskRunning) {
+        // 无论是系统重建还是 AlarmReceiver 拉起，只要监控开启就先保住 WakeLock，
+        // 防止 CPU 在后续逻辑执行前再次休眠（AlarmReceiver 的临时 WakeLock 只有60秒）
+        if (prefs.getBoolean(PREF_RUNNING, false)) {
             safeAcquireWakeLock();
-            runOnce();
+            if (!taskRunning) {
+                runOnce();
+            }
         }
 
         return START_STICKY;
@@ -253,9 +257,11 @@ public class MonitorService extends Service {
 
             @Override
             public void onStatusUpdate(int rowIndex, String billsn, String content) {
-                // 后台静默时：接单成功/失败仍通过通知栏显示，其他状态静默
+                // 后台静默时：接单/反馈/回单的最终结果仍通过通知栏显示，过程状态静默
                 if (silentMode) {
                     if (content.contains("接单成功") || content.contains("接单失败")
+                            || content.contains("反馈成功") || content.contains("反馈完毕")
+                            || content.contains("回单成功") || content.contains("回单失败")
                             || content.contains("服务器响应")) {
                         updateNotification(billsn + " " + content);
                     }
