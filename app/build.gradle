@@ -16,11 +16,15 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            // ★ 开启代码混淆+压缩，防止 APK 被反编译后直接看到账号/密码/接口路径 ★
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
             debuggable true
+            // debug 包不混淆，方便开发调试
+            minifyEnabled false
         }
     }
 
