@@ -3,192 +3,268 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
-    android:background="@drawable/bg_login">
+    android:background="@color/bg_neumorphism"
+    android:fillViewport="true">
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center_horizontal"
         android:padding="24dp">
 
         <!-- Logo 区域 -->
-        <ImageView
-            android:id="@+id/ivLogo"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:layout_marginTop="40dp"
-            android:src="@drawable/ic_logo_tower" />
-
-        <!-- 标题 -->
-        <TextView
+        <LinearLayout
+            android:id="@+id/logoSection"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="铁塔运维助手"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary" />
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginTop="32dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- 副标题 -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Tower Operations Assistant"
-            android:textSize="12sp"
-            android:textColor="@color/text_secondary" />
+            <!-- Logo 图标容器 -->
+            <FrameLayout
+                android:layout_width="100dp"
+                android:layout_height="100dp"
+                android:layout_marginBottom="24dp">
 
-        <!-- 账号选择 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="40dp"
-            android:text="选择账号"
-            android:textSize="14sp"
-            android:textColor="@color/text_primary"
-            android:textStyle="bold" />
-
-        <Spinner
-            android:id="@+id/spinnerAccount"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/bg_spinner"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp" />
-
-        <!-- 图形验证码 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="图形验证码"
-            android:textSize="14sp"
-            android:textColor="@color/text_primary"
-            android:textStyle="bold" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:id="@+id/ivCaptcha"
-                android:layout_width="120dp"
-                android:layout_height="48dp"
-                android:background="@drawable/bg_captcha_image"
-                android:scaleType="centerCrop" />
-
-            <Button
-                android:id="@+id/btnRefreshCaptcha"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:layout_marginStart="12dp"
-                android:text="刷新"
-                android:textColor="@color/text_primary"
-                android:background="@drawable/bg_button_outline"
-                android:textSize="14sp" />
-
-        </LinearLayout>
-
-        <!-- 验证码输入 -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            app:boxBackgroundMode="none"
-            app:hintEnabled="false">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etVerifyCode"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_input"
-                android:padding="16dp"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp"
-                android:textColorHint="@color/text_hint"
-                android:hint="请输入图形验证码"
-                android:inputType="text"
-                android:maxLines="1" />
-
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- 短信验证码/PIN码 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:orientation="horizontal">
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                app:boxBackgroundMode="none"
-                app:hintEnabled="false">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etPin"
+                <View
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_input"
-                    android:padding="16dp"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
-                    android:textColorHint="@color/text_hint"
-                    android:hint="短信验证码/PIN码"
-                    android:inputType="text"
-                    android:maxLines="1" />
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_logo_neumorphism" />
 
-            </com.google.android.material.textfield.TextInputLayout>
+                <ImageView
+                    android:layout_width="45dp"
+                    android:layout_height="45dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_tower"
+                    app:tint="@color/white" />
 
-            <Button
-                android:id="@+id/btnGetSms"
+            </FrameLayout>
+
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:paddingStart="20dp"
-                android:paddingEnd="20dp"
-                android:text="获取短信"
-                android:textColor="@color/text_primary"
-                android:background="@drawable/bg_button_outline"
-                android:textSize="14sp" />
+                android:text="铁塔运维助手"
+                android:textSize="26sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary_neu"
+                android:letterSpacing="0.04"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tower Operations"
+                android:textSize="13sp"
+                android:textStyle="normal"
+                android:textColor="@color/text_secondary_neu"
+                android:letterSpacing="0.12" />
 
         </LinearLayout>
 
-        <!-- 登录按钮 -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnLogin"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="32dp"
-            android:layout_marginBottom="40dp"
-            android:text="登  录"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textColor="@color/white"
-            android:fontFamily="sans-serif-medium"
-            app:cornerRadius="8dp"
-            app:backgroundTint="@null"
-            android:background="@drawable/bg_button_primary"
-            app:elevation="0dp" />
-
-        <!-- 状态提示 -->
-        <TextView
-            android:id="@+id/tvLoginStatus"
-            android:layout_width="match_parent"
+        <!-- 登录表单卡片 -->
+        <LinearLayout
+            android:id="@+id/loginCard"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="20dp"
-            android:text="请输入验证码"
-            android:textSize="14sp"
-            android:textColor="@color/text_secondary"
-            android:gravity="center" />
+            android:orientation="vertical"
+            android:background="@drawable/bg_card_neumorphism"
+            android:padding="44dp"
+            android:layout_marginTop="32dp"
+            app:layout_constraintTop_toBottomOf="@id/logoSection"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
 
-    </LinearLayout>
+            <!-- 账号选择 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="选择账号"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_secondary_neu"
+                android:letterSpacing="0.03"
+                android:layout_marginBottom="12dp" />
+
+            <Spinner
+                android:id="@+id/spinnerAccount"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:background="@drawable/bg_input_neumorphism"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp" />
+
+            <!-- 图形验证码 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="图形验证码"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_secondary_neu"
+                android:letterSpacing="0.03"
+                android:layout_marginTop="28dp"
+                android:layout_marginBottom="12dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <!-- 验证码图片 -->
+                <FrameLayout
+                    android:id="@+id/flCaptcha"
+                    android:layout_width="170dp"
+                    android:layout_height="54dp"
+                    android:background="@drawable/bg_captcha_neumorphism"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:id="@+id/ivCaptcha"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="fitCenter"
+                        android:padding="8dp" />
+
+                </FrameLayout>
+
+                <!-- 刷新按钮 -->
+                <Button
+                    android:id="@+id/btnRefreshCaptcha"
+                    android:layout_width="0dp"
+                    android:layout_height="54dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="16dp"
+                    android:background="@drawable/bg_button_neu"
+                    android:text="刷新"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary_neu"
+                    android:letterSpacing="0.02" />
+
+            </LinearLayout>
+
+            <!-- 验证码输入框 -->
+            <EditText
+                android:id="@+id/etVerifyCode"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:background="@drawable/bg_input_neumorphism"
+                android:hint="请输入验证码"
+                android:textColorHint="@color/text_hint_neu"
+                android:textColor="@color/text_primary_neu"
+                android:textSize="15sp"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:inputType="text" />
+
+            <!-- 短信验证码/PIN码 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="短信验证码 / PIN码"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_secondary_neu"
+                android:letterSpacing="0.03"
+                android:layout_marginTop="28dp"
+                android:layout_marginBottom="12dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <EditText
+                    android:id="@+id/etPin"
+                    android:layout_width="0dp"
+                    android:layout_height="54dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_input_neumorphism"
+                    android:hint="请输入验证码"
+                    android:textColorHint="@color/text_hint_neu"
+                    android:textColor="@color/text_primary_neu"
+                    android:textSize="15sp"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="20dp"
+                    android:inputType="text" />
+
+                <Button
+                    android:id="@+id/btnGetSms"
+                    android:layout_width="130dp"
+                    android:layout_height="54dp"
+                    android:layout_marginStart="16dp"
+                    android:background="@drawable/bg_button_neu"
+                    android:text="获取验证码"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary_neu"
+                    android:letterSpacing="0.02" />
+
+            </LinearLayout>
+
+            <!-- 登录按钮 -->
+            <Button
+                android:id="@+id/btnLogin"
+                android:layout_width="match_parent"
+                android:layout_height="58dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_button_primary_neu"
+                android:text="登录"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/white"
+                android:letterSpacing="0.06" />
+
+            <!-- 状态提示 -->
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text=""
+                android:textSize="13sp"
+                android:textStyle="normal"
+                android:textColor="@color/error_neu"
+                android:gravity="center"
+                android:minHeight="20dp" />
+
+            <!-- 底部装饰 -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_gravity="center"
+                android:layout_marginTop="44dp"
+                android:gravity="center">
+
+                <View
+                    android:layout_width="40dp"
+                    android:layout_height="6dp"
+                    android:background="@drawable/bg_deco_line"
+                    android:layout_marginBottom="12dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tower Operations Assistant"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_hint_neu"
+                    android:letterSpacing="0.08" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </ScrollView>
