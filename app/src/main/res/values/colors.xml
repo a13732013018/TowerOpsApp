@@ -29,7 +29,7 @@
     <!-- 应用图标背景 -->
     <color name="ic_launcher_background">#0d1b3e</color>
     
-    <!-- 新拟态状态颜色 -->
+    <!-- 状态颜色 -->
     <color name="success_neu">#68d391</color>
     <color name="error_neu">#fc8181</color>
 </resources>
