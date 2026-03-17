@@ -25,4 +25,7 @@
     <color name="btn_end">#2563EB</color>
     <color name="btn_pressed_start">#1D4ED8</color>
     <color name="btn_pressed_end">#2563EB</color>
+    
+    <!-- 应用图标背景 -->
+    <color name="ic_launcher_background">#0d1b3e</color>
 </resources>
