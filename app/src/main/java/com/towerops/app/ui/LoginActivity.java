@@ -46,6 +46,15 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // ★ 自动登录：若本地已保存有效的登录凭据，直接跳 MainActivity，无需重新登录 ★
+        Session.get().loadConfig(this);
+        if (!Session.get().token.isEmpty() && !Session.get().userid.isEmpty()) {
+            startActivity(new Intent(this, MainActivity.class));
+            finish();
+            return;
+        }
+
         setContentView(R.layout.activity_login);
 
         spinnerAccount    = findViewById(R.id.spinnerAccount);
