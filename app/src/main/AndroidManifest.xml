@@ -96,6 +96,16 @@
             </intent-filter>
         </receiver>
 
+        <!--
+            JobScheduler 保活兜底：
+            - 系统级调度，不受国产 ROM 省电策略屏蔽
+            - permission="android.permission.BIND_JOB_SERVICE" 是系统要求，必须加
+        -->
+        <service
+            android:name=".worker.MonitorJobService"
+            android:exported="true"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
     </application>
 
 </manifest>
