@@ -4,11 +4,15 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.widget.Button;
@@ -80,6 +84,9 @@ public class MainActivity extends AppCompatActivity {
     private final Handler  debounceHandler  = new Handler(Looper.getMainLooper());
     private       Runnable debounceRunnable;
 
+    // 本地倒计时：前台时自己每秒递减，不依赖 Service 推送
+    private CountDownTimer countDownTimer;
+
     // ── 服务连接 ──────────────────────────────────────────────────────────
 
     private final ServiceConnection conn = new ServiceConnection() {
@@ -129,7 +136,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onNextRun(int delaySec) {
-            tvNextRun.setText("下次：" + delaySec + "秒后");
+            startCountDown(delaySec);
         }
     };
 
@@ -150,6 +157,9 @@ public class MainActivity extends AppCompatActivity {
         btnStop.setOnClickListener(v  -> stopMonitor());
         btnLogout.setOnClickListener(v -> doLogout());
 
+        // ★ 关键：引导用户关闭电池优化，这是后台保活的必要条件 ★
+        requestIgnoreBatteryOptimizations();
+
         Intent intent = new Intent(this, MonitorService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent);
@@ -166,6 +176,10 @@ public class MainActivity extends AppCompatActivity {
             // [BUG-5 修复] 恢复前台：取消静默模式，重新接收 UI 更新
             monitorService.setCallback(serviceCallback, false);
             syncButtonState();
+            // 恢复倒计时：从 prefs 读取下次执行时间，重新开始本地倒数
+            long nextAt   = monitorService.getNextRunAt();
+            int  delaySec = (int) Math.max(0, (nextAt - System.currentTimeMillis()) / 1000);
+            if (delaySec > 0) startCountDown(delaySec);
         }
     }
 
@@ -176,12 +190,15 @@ public class MainActivity extends AppCompatActivity {
         if (serviceBound && monitorService != null) {
             monitorService.setCallback(serviceCallback, true);
         }
+        // 后台不需要本地倒计时，停掉省资源
+        stopCountDown();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         debounceHandler.removeCallbacks(debounceRunnable);
+        stopCountDown();
         if (serviceBound) {
             unbindService(conn);
             serviceBound = false;
@@ -208,6 +225,8 @@ public class MainActivity extends AppCompatActivity {
         monitorService.startMonitor();
         syncButtonState();
         tvProgress.setText("监控已启动");
+        // ★ 每次开始监控时，提示用户开启厂商白名单（弹一次即可，用户记住后不再打扰）
+        goToVendorBatterySettings();
     }
 
     private void stopMonitor() {
@@ -441,5 +460,119 @@ public class MainActivity extends AppCompatActivity {
 
     private static String defaultIfEmpty(String s, String def) {
         return (s == null || s.isEmpty()) ? def : s;
+    }
+
+    /**
+     * 启动本地倒计时，每秒更新 tvNextRun，倒完显示"即将执行..."。
+     * 多次调用时自动取消上次再重新开始。
+     */
+    private void startCountDown(int delaySec) {
+        stopCountDown();
+        tvNextRun.setText("下次：" + delaySec + "秒后");
+        countDownTimer = new CountDownTimer(delaySec * 1000L, 1000L) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+                tvNextRun.setText("下次：" + (millisUntilFinished / 1000) + "秒后");
+            }
+            @Override
+            public void onFinish() {
+                tvNextRun.setText("即将执行...");
+            }
+        }.start();
+    }
+
+    /** 停止并销毁本地倒计时 */
+    private void stopCountDown() {
+        if (countDownTimer != null) {
+            countDownTimer.cancel();
+            countDownTimer = null;
+        }
+    }
+
+    // ── 后台保活：电池优化 + 厂商白名单 ─────────────────────────────────
+
+    /**
+     * 请求系统弹出"忽略电池优化"对话框。
+     * 这是对抗国产 ROM 后台杀进程的第一步，必须用户手动同意才生效。
+     * 仅在未授权时弹出，避免重复打扰。
+     */
+    private void requestIgnoreBatteryOptimizations() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        String pkg = getPackageName();
+        if (pm != null && !pm.isIgnoringBatteryOptimizations(pkg)) {
+            try {
+                Intent intent = new Intent(
+                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        Uri.parse("package:" + pkg));
+                startActivity(intent);
+            } catch (Exception e) {
+                // 部分 ROM 不支持直接跳转，降级到电池优化列表页
+                try {
+                    startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    /**
+     * 跳转到对应厂商的后台管理/自启动白名单设置页面。
+     * 国产 ROM 的后台杀进程不仅受电池优化控制，还有独立的"自启动"/"后台运行"开关，
+     * 必须在厂商自己的设置页里手动开启，代码层面无法绕过。
+     * 在"开始监控"按钮点击时调用，提示用户手动操作一次即可。
+     */
+    private void goToVendorBatterySettings() {
+        String manufacturer = android.os.Build.MANUFACTURER.toLowerCase(java.util.Locale.ROOT);
+        Intent intent = null;
+        try {
+            if (manufacturer.contains("huawei") || manufacturer.contains("honor")) {
+                // 华为：受保护应用 / 应用启动管理
+                intent = new Intent();
+                intent.setComponent(new ComponentName(
+                        "com.huawei.systemmanager",
+                        "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"));
+            } else if (manufacturer.contains("xiaomi") || manufacturer.contains("redmi")) {
+                // 小米：自启动管理
+                intent = new Intent();
+                intent.setComponent(new ComponentName(
+                        "com.miui.securitycenter",
+                        "com.miui.permcenter.autostart.AutoStartManagementActivity"));
+            } else if (manufacturer.contains("oppo") || manufacturer.contains("realme")) {
+                // OPPO/Realme：自启动管理
+                intent = new Intent();
+                intent.setComponent(new ComponentName(
+                        "com.coloros.safecenter",
+                        "com.coloros.privacypermissionsentry.PermissionTopActivity"));
+            } else if (manufacturer.contains("vivo")) {
+                // vivo：后台高耗电
+                intent = new Intent();
+                intent.setComponent(new ComponentName(
+                        "com.vivo.permissionmanager",
+                        "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"));
+            } else if (manufacturer.contains("meizu")) {
+                // 魅族：自启动管理
+                intent = new Intent("com.meizu.safe.security.SHOW_APPSEC");
+                intent.putExtra("packageName", getPackageName());
+            } else if (manufacturer.contains("samsung")) {
+                // 三星：设备维护 > 电池
+                intent = new Intent();
+                intent.setComponent(new ComponentName(
+                        "com.samsung.android.lool",
+                        "com.samsung.android.sm.battery.ui.BatteryActivity"));
+            }
+
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+                Toast.makeText(this,
+                        "请在此页面找到本应用，\n开启\"允许后台运行\"或\"自启动\"",
+                        Toast.LENGTH_LONG).show();
+            }
+        } catch (Exception e) {
+            // 厂商页面跳转失败（ROM 版本差异），降级到系统电池设置
+            try {
+                startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+            } catch (Exception ignored) {}
+        }
     }
 }
