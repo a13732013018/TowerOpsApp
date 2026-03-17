@@ -197,13 +197,6 @@ public class MonitorService extends Service {
     public void setCallback(ServiceCallback cb, boolean silent) {
         this.callback   = cb;
         this.silentMode = silent;
-        if (cb != null && !silent && isRunning()) {
-            long nextAt   = prefs.getLong("next_run_at", 0);
-            int  delaySec = (int) Math.max(0, (nextAt - System.currentTimeMillis()) / 1000);
-            if (delaySec > 0) {
-                mainHandler.post(() -> dispatchNextRun(delaySec));
-            }
-        }
     }
 
     /**
@@ -221,6 +214,11 @@ public class MonitorService extends Service {
 
     public boolean isRunning() {
         return prefs.getBoolean(PREF_RUNNING, false);
+    }
+
+    /** 返回下次轮询的时间戳（毫秒），供 MainActivity 恢复倒计时用 */
+    public long getNextRunAt() {
+        return prefs.getLong("next_run_at", 0);
     }
 
     public void startMonitor() {
@@ -245,6 +243,10 @@ public class MonitorService extends Service {
                 .apply();
         mainHandler.removeCallbacks(timerRunnable);
         cancelAlarm(); // 取消已排队的精确闹钟，防止停止后仍被唤醒
+        // 取消 JobScheduler，防止停止后 Job 触发再把服务拉起来
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            MonitorJobService.cancel(this);
+        }
         taskRunning = false;
         taskStartAt = 0;
         safeReleaseWakeLock();
@@ -329,11 +331,12 @@ public class MonitorService extends Service {
 
     /**
      * 调度下次轮询。
-     * 双保险策略：
+     * 三保险策略：
      *   1. AlarmManager 精确唤醒（WAKE_UP 类型）—— 息屏/Doze 模式下也能按时触发，
      *      触发后由 AlarmReceiver 拉起服务并执行 runOnce()
      *   2. mainHandler.postDelayed 兜底 —— App 在前台时 Handler 更及时，两者取先到的
-     * WakeLock 在等待期间释放省电，AlarmReceiver / timerRunnable 触发时 runOnce 入口重新 acquire。
+     *   3. JobScheduler 兜底 —— 系统级调度，不受 ROM 省电策略限制，精度 ±30s
+     * WakeLock 在等待期间释放省电，各触发器触发时 runOnce 入口重新 acquire。
      */
     private void scheduleNext(int delaySec) {
         long nextAt = System.currentTimeMillis() + delaySec * 1000L;
@@ -348,6 +351,11 @@ public class MonitorService extends Service {
         // ── 方案2：Handler 兜底（App 在前台时更及时）──
         mainHandler.removeCallbacks(timerRunnable);
         mainHandler.postDelayed(timerRunnable, delaySec * 1000L);
+
+        // ── 方案3：JobScheduler 兜底（系统级调度，ROM 不会屏蔽）──
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            MonitorJobService.schedule(this, delaySec);
+        }
     }
 
     /** 设置 AlarmManager 精确唤醒闹钟，由 AlarmReceiver 触发服务重新 runOnce */
