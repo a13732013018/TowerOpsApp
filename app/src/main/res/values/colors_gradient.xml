@@ -14,9 +14,9 @@
     <!-- 卡片背景 -->
     <color name="card_bg">#3D1F42</color>
     
-    <!-- 输入框背景 -->
-    <color name="input_bg">#261430</color>
-    <color name="input_bg_focused">#2D1940</color>
+    <!-- 方案1特有的输入框颜色 -->
+    <color name="input_bg_glass">#261430</color>
+    <color name="input_bg_focused_glass">#2D1940</color>
     
     <!-- 文字颜色 -->
     <color name="text_white">#FFFFFF</color>
