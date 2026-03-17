@@ -4,13 +4,11 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
-import android.os.PowerManager;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.widget.Button;
@@ -19,7 +17,6 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -34,6 +31,36 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * 主界面
+ *
+ * ══════════════ 已修复的 Bug 清单 ══════════════
+ *
+ * [BUG-5] onPause 置 setCallback(null) → 后台运行期间完全失联
+ *   原代码：onPause 调 monitorService.setCallback(null)，
+ *           导致后台运行时 callback=null，
+ *           MonitorService 里直接调 callback.onXxx() 抛 NPE，
+ *           接单/反馈结果全部静默丢失，且服务内有可能因 NPE 崩溃。
+ *   修复：改为 setCallback(serviceCallback, silent=true)，
+ *         保留引用、关闭 UI 更新，onResume 时传 silent=false 恢复显示。
+ *
+ * [BUG-17] onAllDone 回调调 syncConfigFromSession，覆盖用户手动设置
+ *   原代码：每轮工单处理完后，把 Session.appConfig 里的值同步回 CheckBox，
+ *           而 applyTimeSchedule（已删除）或其他逻辑修改了 appConfig，
+ *           用户手动关掉的反馈/接单开关在下一轮完成后被强制恢复为开。
+ *   修复：删除 syncConfigFromSession() 调用，onAllDone 只更新进度文字。
+ *
+ * [BUG-18] 每次键盘敲击都写 SharedPreferences（高频 IO）
+ *   原代码：EditText TextWatcher.afterTextChanged → applyConfigNow → saveConfig，
+ *           用户输入"120"要调3次 apply()。
+ *   修复：加 300ms 防抖，连续输入停止后只写一次。
+ *
+ * [BUG-19] setCallback 接口改为双参数，调用处需同步更新
+ *   修复：onServiceConnected / onResume / onPause 全部更新。
+ *
+ * [BUG-20] setInterval 改名为 setIntervalAndReschedule，调用处需同步更新
+ *   修复：startMonitor / applyConfigNow 全部更新。
+ */
 public class MainActivity extends AppCompatActivity {
 
     // UI 控件
@@ -49,9 +76,11 @@ public class MainActivity extends AppCompatActivity {
     private MonitorService  monitorService;
     private boolean         serviceBound = false;
 
-    // 防抖 Handler
+    // [BUG-18] 防抖 Handler
     private final Handler  debounceHandler  = new Handler(Looper.getMainLooper());
     private       Runnable debounceRunnable;
+
+    // ── 服务连接 ──────────────────────────────────────────────────────────
 
     private final ServiceConnection conn = new ServiceConnection() {
         @Override
@@ -59,6 +88,7 @@ public class MainActivity extends AppCompatActivity {
             MonitorService.LocalBinder lb = (MonitorService.LocalBinder) service;
             monitorService = lb.getService();
             serviceBound   = true;
+            // [BUG-19 修复] silent=false：Activity 在前台，开启 UI 更新
             monitorService.setCallback(serviceCallback, false);
             syncButtonState();
         }
@@ -70,6 +100,7 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    // 服务回调（所有方法均在主线程执行）
     private final MonitorService.ServiceCallback serviceCallback =
             new MonitorService.ServiceCallback() {
 
@@ -86,6 +117,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onAllDone(int done, int total) {
+            // [BUG-17 修复] 不再调 syncConfigFromSession，避免覆盖用户设置
             String time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
             tvProgress.setText("本轮完成 " + done + "/" + total + " 条  " + time);
         }
@@ -100,6 +132,8 @@ public class MainActivity extends AppCompatActivity {
             tvNextRun.setText("下次：" + delaySec + "秒后");
         }
     };
+
+    // ── 生命周期 ──────────────────────────────────────────────────────────
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -116,9 +150,6 @@ public class MainActivity extends AppCompatActivity {
         btnStop.setOnClickListener(v  -> stopMonitor());
         btnLogout.setOnClickListener(v -> doLogout());
 
-        // 启动时检测电池优化，未关闭则引导用户授权
-        checkBatteryOptimization();
-
         Intent intent = new Intent(this, MonitorService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent);
@@ -132,6 +163,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         if (serviceBound && monitorService != null) {
+            // [BUG-5 修复] 恢复前台：取消静默模式，重新接收 UI 更新
             monitorService.setCallback(serviceCallback, false);
             syncButtonState();
         }
@@ -140,6 +172,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        // [BUG-5 修复] 退后台：保留 callback 引用但静默，Service 继续全速运行
         if (serviceBound && monitorService != null) {
             monitorService.setCallback(serviceCallback, true);
         }
@@ -153,7 +186,10 @@ public class MainActivity extends AppCompatActivity {
             unbindService(conn);
             serviceBound = false;
         }
+        // 不 stopService，让服务继续后台运行
     }
+
+    // ── 开始 / 停止 ───────────────────────────────────────────────────────
 
     private void startMonitor() {
         if (!serviceBound || monitorService == null) {
@@ -165,6 +201,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         buildConfig();
+        // [BUG-20 修复] 改用新方法名，触发立即重新调度
         monitorService.setIntervalAndReschedule(
                 parseInt(etIntMin.getText().toString(), 90),
                 parseInt(etIntMax.getText().toString(), 120));
@@ -183,9 +220,11 @@ public class MainActivity extends AppCompatActivity {
 
     /** 退出登录：清除本地凭据，停止服务，跳回登录页 */
     private void doLogout() {
+        // 停止监控服务
         if (serviceBound && monitorService != null) {
             monitorService.stopMonitor();
         }
+        // 清除内存里的登录信息
         Session s = Session.get();
         s.token       = "";
         s.userid      = "";
@@ -193,45 +232,17 @@ public class MainActivity extends AppCompatActivity {
         s.username    = "";
         s.realname    = "";
         s.appConfig   = "";
+        // 清除 SharedPreferences 里的持久化登录信息
         getApplicationContext()
             .getSharedPreferences("session_prefs", Context.MODE_PRIVATE)
             .edit().clear().apply();
+        // 停止服务（退出登录后不需要继续后台跑）
         stopService(new Intent(this, MonitorService.class));
+        // 跳回登录页
         Intent intent = new Intent(this, LoginActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
-    }
-
-    /** 检测电池优化，引导用户关闭，解决国产 ROM 后台杀进程问题 */
-    private void checkBatteryOptimization() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
-        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-        if (pm == null) return;
-        String pkg = getPackageName();
-        if (pm.isIgnoringBatteryOptimizations(pkg)) return;
-
-        new AlertDialog.Builder(this)
-                .setTitle("需要关闭电池优化")
-                .setMessage("检测到本应用受电池优化限制。\n\n"
-                        + "息屏或切到后台后，系统可能会限制网络访问，导致后台自动接单失败。\n\n"
-                        + "请在接下来的系统设置页中，将本应用设为「不限制」或「允许后台活动」，"
-                        + "确保后台稳定运行。")
-                .setPositiveButton("去设置", (d, w) -> {
-                    try {
-                        Intent intent = new Intent(
-                                android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                                Uri.parse("package:" + pkg));
-                        startActivity(intent);
-                    } catch (Exception e) {
-                        try {
-                            startActivity(new Intent(
-                                    android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
-                        } catch (Exception ignored) {}
-                    }
-                })
-                .setNegativeButton("暂不设置", null)
-                .show();
     }
 
     private void syncButtonState() {
@@ -246,7 +257,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // ── 配置监听 ──────────────────────────────────────────────────────────
+
     private void setupConfigWatchers() {
+        // [BUG-18 修复] TextWatcher 通过防抖触发，连续输入停止300ms后才写入
         TextWatcher watcher = new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
@@ -272,9 +286,13 @@ public class MainActivity extends AppCompatActivity {
         debounceHandler.postDelayed(debounceRunnable, 300L);
     }
 
+    /**
+     * 立即将当前 UI 配置写入 Session 并通知 Service 重新调度轮询间隔。
+     */
     private void applyConfigNow() {
         buildConfig();
         if (serviceBound && monitorService != null) {
+            // [BUG-20 修复] 改用新方法名，阈值修改立即生效
             monitorService.setIntervalAndReschedule(
                     parseInt(etIntMin.getText().toString(), 90),
                     parseInt(etIntMax.getText().toString(), 120));
@@ -298,6 +316,8 @@ public class MainActivity extends AppCompatActivity {
                     + accMinStr + "|" + accMaxStr;
         s.saveConfig(this);
     }
+
+    // ── 视图初始化 ────────────────────────────────────────────────────────
 
     private void bindViews() {
         tvUserInfo          = findViewById(R.id.tvUserInfo);
@@ -412,6 +432,8 @@ public class MainActivity extends AppCompatActivity {
         Session s = Session.get();
         tvUserInfo.setText(s.username.isEmpty() ? "未登录" : s.username + " | " + s.userid);
     }
+
+    // ── 静态工具 ──────────────────────────────────────────────────────────
 
     private static int parseInt(String s, int def) {
         try { return Integer.parseInt(s.trim()); } catch (Exception e) { return def; }
