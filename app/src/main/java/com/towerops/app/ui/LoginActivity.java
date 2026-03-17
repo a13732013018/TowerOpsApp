@@ -32,7 +32,8 @@ public class LoginActivity extends AppCompatActivity {
     private Spinner   spinnerAccount;
     private EditText  etVerifyCode;
     private EditText  etPin;
-    private ImageView ivCaptcha;       // 验证码图片
+    private ImageView ivCaptcha;
+    private ImageView ivLogo;
     private Button    btnRefreshCaptcha;
     private Button    btnGetSms;
     private Button    btnLogin;
@@ -47,7 +48,7 @@ public class LoginActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // ★ 自动登录：若本地已保存有效的登录凭据，直接跳 MainActivity，无需重新登录 ★
+        // 自动登录：若本地已保存有效的登录凭据，直接跳 MainActivity，无需重新登录
         Session.get().loadConfig(this);
         if (!Session.get().token.isEmpty() && !Session.get().userid.isEmpty()) {
             startActivity(new Intent(this, MainActivity.class));
@@ -61,6 +62,7 @@ public class LoginActivity extends AppCompatActivity {
         etVerifyCode      = findViewById(R.id.etVerifyCode);
         etPin             = findViewById(R.id.etPin);
         ivCaptcha         = findViewById(R.id.ivCaptcha);
+        ivLogo            = findViewById(R.id.ivLogo);
         btnRefreshCaptcha = findViewById(R.id.btnRefreshCaptcha);
         btnGetSms         = findViewById(R.id.btnGetSms);
         btnLogin          = findViewById(R.id.btnLogin);
@@ -170,10 +172,15 @@ public class LoginActivity extends AppCompatActivity {
                 if (r.success) {
                     Session s     = Session.get();
                     s.userid      = r.userid;
-                    s.token       = r.token;
+                    s.token       = r.token;       // 协议头由 WorkOrderApi 统一用 token 构建
                     s.mobilephone = r.mobilephone;
                     s.username    = r.username;
+                    // realname = 账号对应的中文真实姓名（AccountConfig 第三列）
+                    // 用于后台接单/回单时匹配工单里的 acceptOperator（中文姓名）
                     s.realname    = AccountConfig.getRealname(idx);
+                    // 持久化登录凭据：服务被系统重建(START_STICKY)后进程重启，
+                    //   内存变量清空，必须从 SharedPreferences 恢复 token，
+                    //   否则后台接单时 Authorization 头为空，服务器鉴权失败
                     s.saveLogin(this);
 
                     Toast.makeText(this, "登录成功！" + r.username, Toast.LENGTH_SHORT).show();
@@ -182,6 +189,7 @@ public class LoginActivity extends AppCompatActivity {
                 } else {
                     tvStatus.setText(r.message);
                     Toast.makeText(this, "登录失败：" + r.message, Toast.LENGTH_LONG).show();
+                    // 登录失败刷新验证码
                     loadCaptcha();
                 }
             });
