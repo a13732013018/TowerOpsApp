@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 新拟态主色调 -->
+    <color name="bg_neumorphism">#e0e5ec</color>
+    
+    <!-- 阴影颜色 -->
+    <color name="shadow_light">#ffffff</color>
+    <color name="shadow_dark">#bec3c9</color>
+    
+    <!-- 渐变色 -->
+    <color name="gradient_start">#6c63ff</color>
+    <color name="gradient_end">#00cece</color>
+    
+    <!-- 文字颜色 -->
+    <color name="text_primary_neu">#4a5568</color>
+    <color name="text_secondary_neu">#718096</color>
+    <color name="text_hint_neu">#a0aec0</color>
+    
+    <!-- 状态颜色 -->
+    <color name="error_neu">#fc8181</color>
+    <color name="success_neu">#68d391</color>
+    
+    <!-- 基础色 -->
+    <color name="white">#ffffff</color>
+</resources>
