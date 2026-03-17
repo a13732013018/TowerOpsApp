@@ -172,7 +172,7 @@ public class MonitorTask implements Runnable {
         // ── Step 6：等待全部完成（动态超时）──────────────────────────────
         // 超时计算：
         //   告警查询已耗时最多2分钟（Step 2b 限时）
-        //   每条工单操作：OP_SEQUENCE_LOCK 间隔5秒 + 随机等待最多10秒 + 网络约5秒 ≈ 30秒
+        //   每条工单操作：OP_SEQUENCE_LOCK 随机间隔8~15秒 + 随机等待最多10秒 + 网络约5秒 ≈ 30秒
         //   串行时序锁下 N 条工单最多耗时 N×30秒
         //   最少保底 7 分钟，最多上限 45 分钟（与 MonitorService WATCHDOG_MS 对齐）
         long dynamicTimeoutSec = Math.min(45 * 60L, Math.max(7 * 60L, 120L + (long) count * 30L));
