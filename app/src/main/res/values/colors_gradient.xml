@@ -5,21 +5,10 @@
     <color name="gradient_center">#302b63</color>
     <color name="gradient_end">#24243e</color>
     
-    <!-- 按钮渐变 -->
-    <color name="button_start">#e94560</color>
-    <color name="button_end">#ff6b9d</color>
-    <color name="button_pressed_start">#d63855</color>
-    <color name="button_pressed_end">#e05a8d</color>
-    
     <!-- 卡片背景 -->
     <color name="card_bg">#3D1F42</color>
     
-    <!-- 方案1特有的输入框颜色 -->
-    <color name="input_bg_glass">#261430</color>
-    <color name="input_bg_focused_glass">#2D1940</color>
-    
     <!-- 文字颜色 -->
-    <color name="text_white">#FFFFFF</color>
     <color name="text_label_glass">#8080A0</color>
     <color name="text_hint_glass">#606080</color>
     
