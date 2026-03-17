@@ -3,11 +3,17 @@ package com.towerops.app.worker;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.PowerManager;
 
 /**
- * AlarmReceiver —— 保留兼容（新版已不使用 AlarmManager，此类仅作备用）
- * 如果系统因某种原因触发了旧广播，直接拉起服务即可。
+ * AlarmReceiver —— 接收 AlarmManager 精确唤醒广播，保证息屏/Doze 模式下轮询按时触发。
+ *
+ * 工作流程：
+ *   scheduleNext() 设定精确闹钟 → 系统唤醒 CPU → onReceive() 先拿 WakeLock → 再启动服务
+ *
+ * 防重入：只有 PREF_RUNNING=true 且服务确实需要继续时才拉起，
+ *   Service 内部的 runOnce() 有 taskRunning 守卫，不会真正双触发。
  */
 public class AlarmReceiver extends BroadcastReceiver {
 
@@ -15,8 +21,18 @@ public class AlarmReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        // 先拿 WakeLock，防止 CPU 在 startForegroundService 完成前再次休眠
         acquireWakeLock(context);
-        MonitorService.startSelf(context);
+
+        // 只有用户开了监控才拉起服务，避免误触
+        SharedPreferences prefs = context.getSharedPreferences(
+                MonitorService.PREF_NAME, Context.MODE_PRIVATE);
+        if (prefs.getBoolean(MonitorService.PREF_RUNNING, false)) {
+            MonitorService.startSelf(context);
+        } else {
+            // 监控已停止，释放 WakeLock 即可
+            releaseWakeLock();
+        }
     }
 
     private static synchronized void acquireWakeLock(Context ctx) {
@@ -29,7 +45,7 @@ public class AlarmReceiver extends BroadcastReceiver {
             sWakeLock.setReferenceCounted(false);
         }
         if (!sWakeLock.isHeld()) {
-            sWakeLock.acquire(60 * 1000L);
+            sWakeLock.acquire(60 * 1000L); // 最多持有60秒，服务启动后自己管理 WakeLock
         }
     }
 
