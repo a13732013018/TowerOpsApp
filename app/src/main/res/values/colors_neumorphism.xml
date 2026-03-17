@@ -19,7 +19,4 @@
     <!-- 状态颜色 -->
     <color name="error_neu">#fc8181</color>
     <color name="success_neu">#68d391</color>
-    
-    <!-- 基础色 -->
-    <color name="white">#ffffff</color>
 </resources>
