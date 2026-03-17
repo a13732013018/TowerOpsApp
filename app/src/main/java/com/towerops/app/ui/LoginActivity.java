@@ -170,15 +170,10 @@ public class LoginActivity extends AppCompatActivity {
                 if (r.success) {
                     Session s     = Session.get();
                     s.userid      = r.userid;
-                    s.token       = r.token;       // 协议头由 WorkOrderApi 统一用 token 构建
+                    s.token       = r.token;
                     s.mobilephone = r.mobilephone;
                     s.username    = r.username;
-                    // [BUG-FIX] realname = 账号对应的中文真实姓名（AccountConfig 第三列）
-                    // 用于后台接单/回单时匹配工单里的 acceptOperator（中文姓名）
                     s.realname    = AccountConfig.getRealname(idx);
-                    // ★ 持久化登录凭据：服务被系统重建(START_STICKY)后进程重启，
-                    //   内存变量清空，必须从 SharedPreferences 恢复 token，
-                    //   否则后台接单时 Authorization 头为空，服务器鉴权失败 ★
                     s.saveLogin(this);
 
                     Toast.makeText(this, "登录成功！" + r.username, Toast.LENGTH_SHORT).show();
@@ -187,7 +182,6 @@ public class LoginActivity extends AppCompatActivity {
                 } else {
                     tvStatus.setText(r.message);
                     Toast.makeText(this, "登录失败：" + r.message, Toast.LENGTH_LONG).show();
-                    // 登录失败刷新验证码
                     loadCaptcha();
                 }
             });
