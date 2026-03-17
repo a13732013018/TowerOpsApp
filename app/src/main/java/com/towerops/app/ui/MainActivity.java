@@ -64,7 +64,7 @@ import java.util.Locale;
 public class MainActivity extends AppCompatActivity {
 
     // UI 控件
-    private TextView        tvUserInfo, tvProgress, tvNextRun;
+    private TextView        tvUserInfo, tvProgress, tvNextRun, btnLogout;
     private TextView        btnSortBillTime, btnSortFeedbackTime,
                             btnSortAlertTime, btnSortAlertStatus, tvSortDesc;
     private CheckBox        cbFeedback, cbAccept, cbRevert;
@@ -148,6 +148,7 @@ public class MainActivity extends AppCompatActivity {
 
         btnStart.setOnClickListener(v -> startMonitor());
         btnStop.setOnClickListener(v  -> stopMonitor());
+        btnLogout.setOnClickListener(v -> doLogout());
 
         Intent intent = new Intent(this, MonitorService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -215,6 +216,33 @@ public class MainActivity extends AppCompatActivity {
         syncButtonState();
         tvProgress.setText("已停止");
         tvNextRun.setText("");
+    }
+
+    /** 退出登录：清除本地凭据，停止服务，跳回登录页 */
+    private void doLogout() {
+        // 停止监控服务
+        if (serviceBound && monitorService != null) {
+            monitorService.stopMonitor();
+        }
+        // 清除内存里的登录信息
+        Session s = Session.get();
+        s.token       = "";
+        s.userid      = "";
+        s.mobilephone = "";
+        s.username    = "";
+        s.realname    = "";
+        s.appConfig   = "";
+        // 清除 SharedPreferences 里的持久化登录信息
+        getApplicationContext()
+            .getSharedPreferences("session_prefs", Context.MODE_PRIVATE)
+            .edit().clear().apply();
+        // 停止服务（退出登录后不需要继续后台跑）
+        stopService(new Intent(this, MonitorService.class));
+        // 跳回登录页
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
     }
 
     private void syncButtonState() {
@@ -295,6 +323,7 @@ public class MainActivity extends AppCompatActivity {
         tvUserInfo          = findViewById(R.id.tvUserInfo);
         tvProgress          = findViewById(R.id.tvProgress);
         tvNextRun           = findViewById(R.id.tvNextRun);
+        btnLogout           = findViewById(R.id.btnLogout);
         btnSortBillTime     = findViewById(R.id.btnSortBillTime);
         btnSortFeedbackTime = findViewById(R.id.btnSortFeedbackTime);
         btnSortAlertTime    = findViewById(R.id.btnSortAlertTime);
