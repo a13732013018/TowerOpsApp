@@ -1,4 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#e94560</color>
+    <!-- 主色调 -->
+    <color name="primary_blue">#3B82F6</color>
+    <color name="primary_dark">#1E3A8A</color>
+    <color name="primary_light">#60A5FA</color>
+
+    <!-- 背景色 -->
+    <color name="bg_start">#F5F7FA</color>
+    <color name="bg_end">#E4E8EC</color>
+
+    <!-- 文字颜色 -->
+    <color name="text_primary">#1F2937</color>
+    <color name="text_secondary">#6B7280</color>
+    <color name="text_hint">#9CA3AF</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- 输入框颜色 -->
+    <color name="input_bg">#FFFFFF</color>
+    <color name="input_border">#D1D5DB</color>
+    <color name="input_border_focused">#3B82F6</color>
+
+    <!-- 按钮颜色 -->
+    <color name="btn_start">#3B82F6</color>
+    <color name="btn_end">#2563EB</color>
+    <color name="btn_pressed_start">#1D4ED8</color>
+    <color name="btn_pressed_end">#2563EB</color>
 </resources>
