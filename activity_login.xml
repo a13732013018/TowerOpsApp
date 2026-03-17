@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="8dp"
+        android:padding="0dp"
         android:gravity="center_horizontal">
 
         <!-- Logo 区域 -->
@@ -71,19 +71,21 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/bg_card_glass"
-            android:padding="24dp"
-            android:layout_marginBottom="12dp">
+            android:padding="28dp"
+            android:paddingBottom="24dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="0dp">
 
             <!-- 账号选择 -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="选择账号"
-                android:textSize="12sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
-                android:textColor="#A080A0"
+                android:textColor="#E8C4E8"
                 android:letterSpacing="0.03"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="14dp" />
 
             <Spinner
                 android:id="@+id/spinnerAccount"
@@ -99,12 +101,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="图形验证码"
-                android:textSize="12sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
-                android:textColor="#A080A0"
+                android:textColor="#E8C4E8"
                 android:letterSpacing="0.03"
-                android:layout_marginTop="24dp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginTop="28dp"
+                android:layout_marginBottom="14dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -115,8 +117,8 @@
                 <!-- 验证码图片 -->
                 <FrameLayout
                     android:id="@+id/flCaptcha"
-                    android:layout_width="160dp"
-                    android:layout_height="52dp"
+                    android:layout_width="140dp"
+                    android:layout_height="56dp"
                     android:background="@drawable/bg_captcha_glass"
                     android:clickable="true"
                     android:focusable="true">
@@ -125,8 +127,8 @@
                         android:id="@+id/ivCaptcha"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:scaleType="fitCenter"
-                        android:padding="8dp" />
+                        android:scaleType="fitXY"
+                        android:padding="0dp" />
 
                 </FrameLayout>
 
@@ -134,7 +136,7 @@
                 <Button
                     android:id="@+id/btnRefreshCaptcha"
                     android:layout_width="0dp"
-                    android:layout_height="52dp"
+                    android:layout_height="56dp"
                     android:layout_weight="1"
                     android:layout_marginStart="12dp"
                     android:background="@drawable/bg_button_secondary"
@@ -150,16 +152,16 @@
             <EditText
                 android:id="@+id/etVerifyCode"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="12dp"
-                android:layout_marginBottom="8dp"
+                android:layout_height="56dp"
+                android:layout_marginTop="14dp"
+                android:layout_marginBottom="10dp"
                 android:background="@drawable/bg_input_glass"
-                android:hint="请输入验证码"
-                android:textColorHint="#606080"
+                android:hint="请输入图形验证码"
+                android:textColorHint="#8080A0"
                 android:textColor="#FFFFFF"
-                android:textSize="15sp"
-                android:paddingStart="18dp"
-                android:paddingEnd="18dp"
+                android:textSize="16sp"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
                 android:inputType="text" />
 
             <!-- 短信验证码/PIN码 -->
@@ -167,12 +169,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="短信验证码 / PIN码"
-                android:textSize="12sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
-                android:textColor="#A080A0"
+                android:textColor="#E8C4E8"
                 android:letterSpacing="0.03"
-                android:layout_marginTop="24dp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginTop="28dp"
+                android:layout_marginBottom="14dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -183,25 +185,25 @@
                 <EditText
                     android:id="@+id/etPin"
                     android:layout_width="0dp"
-                    android:layout_height="52dp"
+                    android:layout_height="56dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_input_glass"
-                    android:hint="请输入验证码"
-                    android:textColorHint="#606080"
+                    android:hint="请输入短信验证码"
+                    android:textColorHint="#8080A0"
                     android:textColor="#FFFFFF"
-                    android:textSize="15sp"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
+                    android:textSize="16sp"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="20dp"
                     android:inputType="text" />
 
                 <Button
                     android:id="@+id/btnGetSms"
-                    android:layout_width="120dp"
-                    android:layout_height="52dp"
+                    android:layout_width="130dp"
+                    android:layout_height="56dp"
                     android:layout_marginStart="12dp"
                     android:background="@drawable/bg_button_secondary"
                     android:text="获取验证码"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:textStyle="bold"
                     android:textColor="#FFFFFF"
                     android:letterSpacing="0.02" />
@@ -212,14 +214,14 @@
             <Button
                 android:id="@+id/btnLogin"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="16dp"
+                android:layout_height="60dp"
+                android:layout_marginTop="24dp"
                 android:background="@drawable/bg_button_primary_gradient"
-                android:text="登录"
-                android:textSize="16sp"
+                android:text="登 录"
+                android:textSize="17sp"
                 android:textStyle="bold"
                 android:textColor="#FFFFFF"
-                android:letterSpacing="0.06" />
+                android:letterSpacing="0.08" />
 
             <!-- 状态提示 -->
             <TextView
@@ -241,11 +243,11 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Tower Operations Assistant"
-            android:textSize="11sp"
+            android:textSize="10sp"
             android:textStyle="bold"
-            android:textColor="#404060"
-            android:letterSpacing="0.08"
-            android:layout_marginBottom="16dp" />
+            android:textColor="#505070"
+            android:letterSpacing="0.1"
+            android:layout_marginBottom="20dp" />
 
     </LinearLayout>
 
