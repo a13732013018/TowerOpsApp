@@ -24,13 +24,16 @@ public class AlarmReceiver extends BroadcastReceiver {
         // 先拿 WakeLock，防止 CPU 在 startForegroundService 完成前再次休眠
         acquireWakeLock(context);
 
-        // 只有用户开了监控才拉起服务，避免误触
+        // 双重检查：PREF_RUNNING=true 且用户没有主动停止，才拉起服务继续轮询
+        // PREF_USER_STOPPED=true 表示用户手动点了停止，不自动恢复
         SharedPreferences prefs = context.getSharedPreferences(
                 MonitorService.PREF_NAME, Context.MODE_PRIVATE);
-        if (prefs.getBoolean(MonitorService.PREF_RUNNING, false)) {
+        boolean running     = prefs.getBoolean(MonitorService.PREF_RUNNING,      false);
+        boolean userStopped = prefs.getBoolean(MonitorService.PREF_USER_STOPPED, true);
+        if (running && !userStopped) {
             MonitorService.startSelf(context);
         } else {
-            // 监控已停止，释放 WakeLock 即可
+            // 监控已停止或用户主动停止，释放 WakeLock 即可
             releaseWakeLock();
         }
     }
