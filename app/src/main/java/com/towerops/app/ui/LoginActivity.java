@@ -82,7 +82,7 @@ public class LoginActivity extends AppCompatActivity {
         btnLogin          = findViewById(R.id.btnLogin);
         tvStatus          = findViewById(R.id.tvStatus);
 
-        // 设置账号下拉框
+               // 设置账号下拉框
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_item, AccountConfig.getDisplayNames());
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
