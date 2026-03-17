@@ -2,10 +2,6 @@ package com.towerops.app.model;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.util.Log;
-
-import androidx.security.crypto.EncryptedSharedPreferences;
-import androidx.security.crypto.MasterKey;
 
 /**
  * 全局会话信息 —— 登录成功后持久保存，供所有线程使用（等价于易语言全局变量）
@@ -44,7 +40,7 @@ public class Session {
     public volatile String appConfig    = ""; // 选1|选2|选5|阈值反馈|阈值接单 用 \u0001 分隔
     public volatile String[] taskArray  = new String[0];
 
-    private static final String PREF_SESSION    = "session_prefs_enc";  // 改名，与旧明文 prefs 隔离
+    private static final String PREF_SESSION    = "session_prefs";
     private static final String KEY_APP_CONFIG  = "app_config";
     private static final String KEY_USERID      = "userid";
     private static final String KEY_TOKEN       = "token";
@@ -53,47 +49,25 @@ public class Session {
     private static final String KEY_REALNAME    = "realname";
 
     /**
-     * 获取 AES256 加密的 SharedPreferences 实例。
-     * Token/userid 等敏感凭据用此方法存取，无法通过 /data/data 文件直接读出明文。
-     * 若创建加密存储失败（低版本ROM罕见），降级到普通 SharedPreferences 保证不崩溃。
-     */
-    private static SharedPreferences getSecurePrefs(Context ctx) {
-        try {
-            MasterKey masterKey = new MasterKey.Builder(ctx.getApplicationContext())
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build();
-            return EncryptedSharedPreferences.create(
-                    ctx.getApplicationContext(),
-                    PREF_SESSION,
-                    masterKey,
-                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM);
-        } catch (Exception e) {
-            Log.w("Session", "EncryptedSharedPreferences 创建失败，降级到普通存储", e);
-            return ctx.getApplicationContext()
-                      .getSharedPreferences(PREF_SESSION + "_plain", Context.MODE_PRIVATE);
-        }
-    }
-
-    /**
-     * 将 appConfig 持久化（加密存储）。
+     * 将 appConfig 持久化到 SharedPreferences。
      * 在 MainActivity.buildConfig() 写入 appConfig 后立刻调用。
      */
     public void saveConfig(Context ctx) {
-        getSecurePrefs(ctx)
+        ctx.getApplicationContext()
+           .getSharedPreferences(PREF_SESSION, Context.MODE_PRIVATE)
            .edit()
            .putString(KEY_APP_CONFIG, appConfig)
            .apply();
     }
 
     /**
-     * 登录成功后调用：把登录凭据（token/userid 等）写入加密 SharedPreferences。
+     * 登录成功后调用：把登录凭据（token/userid 等）写入 SharedPreferences。
      * 服务被系统重建（START_STICKY）时进程可能重启，内存变量丢失，
      * 必须持久化才能让后台接单的 Authorization 头带上正确的 token。
-     * ★ 使用 AES256 加密，即使手机被 root 也无法直接读出明文 token ★
      */
     public void saveLogin(Context ctx) {
-        getSecurePrefs(ctx)
+        ctx.getApplicationContext()
+           .getSharedPreferences(PREF_SESSION, Context.MODE_PRIVATE)
            .edit()
            .putString(KEY_USERID,      userid)
            .putString(KEY_TOKEN,       token)
@@ -104,11 +78,12 @@ public class Session {
     }
 
     /**
-     * 从加密 SharedPreferences 恢复 appConfig 和登录凭据（服务重建/进程恢复时调用）。
+     * 从 SharedPreferences 恢复 appConfig 和登录凭据（服务重建/进程恢复时调用）。
      * 若 prefs 里没有，对应字段保持原值不变。
      */
     public void loadConfig(Context ctx) {
-        SharedPreferences sp = getSecurePrefs(ctx);
+        SharedPreferences sp = ctx.getApplicationContext()
+                .getSharedPreferences(PREF_SESSION, Context.MODE_PRIVATE);
 
         String savedConfig = sp.getString(KEY_APP_CONFIG, "");
         if (!savedConfig.isEmpty()) appConfig = savedConfig;
