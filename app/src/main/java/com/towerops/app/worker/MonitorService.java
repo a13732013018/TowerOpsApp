@@ -65,10 +65,17 @@ import java.util.concurrent.Executors;
 public class MonitorService extends Service {
 
     // ── 常量 ──────────────────────────────────────────────────────────────
-    public static final String PREF_NAME    = "monitor_prefs";
-    public static final String PREF_RUNNING = "is_running";
-    public static final String PREF_INT_MIN = "interval_min";
-    public static final String PREF_INT_MAX = "interval_max";
+    public static final String PREF_NAME         = "monitor_prefs";
+    public static final String PREF_RUNNING      = "is_running";
+    public static final String PREF_INT_MIN      = "interval_min";
+    public static final String PREF_INT_MAX      = "interval_max";
+    /**
+     * 用户是否主动停止了监控。
+     * true  = 用户点了"停止监控"按钮，重新打开 App 不自动恢复。
+     * false = 正常运行中被系统杀死（START_STICKY 重建）或开机恢复，应继续轮询。
+     * 首次安装默认 true，即首次打开不自动启动，必须人工点"开始监控"。
+     */
+    public static final String PREF_USER_STOPPED = "user_stopped";
 
     private static final String CHANNEL_ID  = "tower_ops_monitor";
     private static final int    NOTIF_ID    = 1001;
@@ -151,9 +158,13 @@ public class MonitorService extends Service {
         // 服务重建时恢复登录凭据和配置（START_STICKY 进程重建后内存清空，必须从 prefs 恢复）
         Session.get().loadConfig(this);
 
-        // 无论是系统重建还是 AlarmReceiver 拉起，只要监控开启就先保住 WakeLock，
-        // 防止 CPU 在后续逻辑执行前再次休眠（AlarmReceiver 的临时 WakeLock 只有60秒）
-        if (prefs.getBoolean(PREF_RUNNING, false)) {
+        // 恢复逻辑：区分"用户主动停止"和"系统杀死重建"两种情况。
+        // PREF_USER_STOPPED=true  → 用户手动停止过，不自动恢复，等用户点"开始监控"
+        // PREF_USER_STOPPED=false → 系统 kill 后 START_STICKY 重建 / AlarmReceiver 拉起，
+        //                           用户没有手动停，继续轮询。
+        // 首次安装 PREF_USER_STOPPED 默认 true，打开 App 必须人工点按钮才能启动。
+        boolean userStopped = prefs.getBoolean(PREF_USER_STOPPED, true);
+        if (prefs.getBoolean(PREF_RUNNING, false) && !userStopped) {
             safeAcquireWakeLock();
             if (!taskRunning) {
                 runOnce();
@@ -214,7 +225,11 @@ public class MonitorService extends Service {
 
     public void startMonitor() {
         if (isRunning()) return;
-        prefs.edit().putBoolean(PREF_RUNNING, true).apply();
+        // 用户主动点击"开始监控"：清除手动停止标志，允许后续 START_STICKY 重建时自动恢复
+        prefs.edit()
+                .putBoolean(PREF_RUNNING, true)
+                .putBoolean(PREF_USER_STOPPED, false)
+                .apply();
         updateNotification("监控运行中，自动处理工单...");
         if (!taskRunning) {
             safeAcquireWakeLock();
@@ -223,7 +238,11 @@ public class MonitorService extends Service {
     }
 
     public void stopMonitor() {
-        prefs.edit().putBoolean(PREF_RUNNING, false).apply();
+        // 用户主动点击"停止监控"：写入手动停止标志，重新打开 App 不自动恢复
+        prefs.edit()
+                .putBoolean(PREF_RUNNING, false)
+                .putBoolean(PREF_USER_STOPPED, true)
+                .apply();
         mainHandler.removeCallbacks(timerRunnable);
         cancelAlarm(); // 取消已排队的精确闹钟，防止停止后仍被唤醒
         taskRunning = false;
