@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#120228</color>
+    <color name="success_neu">#4CAF50</color>
+    <color name="error_neu">#F44336</color>
 </resources>
